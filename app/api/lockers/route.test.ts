@@ -1,62 +1,59 @@
+import { jest } from "@jest/globals"
+
 import { createTestDb } from "@/test/support/test-db"
-
-import { auth } from "@infrastructure/auth/auth"
-import { pool as appPool } from "@infrastructure/db/client"
-import { lockerSize } from "@infrastructure/db/schema/locker-size"
-import { station } from "@infrastructure/db/schema/station"
-
-import { GET, POST } from "./route"
 
 const { pool, db } = createTestDb()
 
 /**
- * The route handlers over HTTP, which is the only place 401 and 403 are
- * actually distinguishable.
+ * The handlers, with the session *looked up* rather than *earned*.
  *
- * The guard is unit-tested separately; what this proves is that the handlers
- * call it, and that the statuses survive the trip through a `Response`.
+ * Signing a user up and signing them back in to obtain a cookie would test
+ * BetterAuth, which `auth.test.ts` already does — here it would be a slow
+ * fixture standing between this test and the thing it is actually asserting.
+ *
+ * What is stubbed is only the session lookup. `createGuards` still runs for
+ * real, so the 401-versus-403 decision is the real one and the handler is
+ * genuinely wired to it; a stubbed guard would be this test asserting its own
+ * mock. Everything below the handler — validation, the repository, the unique
+ * index — is real too.
  */
-const PASSWORD = "correct-horse-battery"
+const currentSession: { value: unknown } = { value: null }
 
-const signUp = async (email: string, role: string): Promise<string> => {
-  const response = await auth.api.signUpEmail({
-    body: { email, password: PASSWORD, name: "Test Person" },
-    asResponse: true,
-  })
+jest.unstable_mockModule("@infrastructure/auth/auth", () => ({
+  auth: { api: { getSession: async () => currentSession.value } },
+  ROLES: ["admin", "agent", "customer"] as const,
+  DEFAULT_ROLE: "customer",
+}))
 
-  await pool.query(`UPDATE "user" SET role = $1 WHERE email = $2`, [
-    role,
-    email,
-  ])
+// Imported after the mock is registered: an ESM module graph is resolved on
+// import, so a static import here would bind the real `auth` first.
+const { GET, POST } = await import("./route")
+const { pool: appPool } = await import("@infrastructure/db/client")
+const { lockerSize } = await import("@infrastructure/db/schema/locker-size")
+const { station } = await import("@infrastructure/db/schema/station")
 
-  // Trimmed to `name=value`: a Set-Cookie sent back whole carries attributes a
-  // Cookie header must not have, and the session then does not resolve.
-  const cookie = (response.headers.get("set-cookie") ?? "").split(";")[0]
+/** A uuid, because `created_by` is a uuid column even though it carries no key. */
+const ADMIN_ID = "019fb1ad-d64b-7fe4-bde0-9c4044892047"
 
-  // The role changed after the session was issued, so a fresh sign-in is what
-  // puts the new role on it.
-  const signedIn = await auth.api.signInEmail({
-    body: { email, password: PASSWORD },
-    asResponse: true,
-  })
-
-  return (signedIn.headers.get("set-cookie") ?? cookie).split(";")[0]
+const signedInAs = (role: string) => {
+  currentSession.value = { user: { id: ADMIN_ID, role } }
 }
 
-const request = (url: string, cookie?: string, body?: unknown) =>
+const signedOut = () => {
+  currentSession.value = null
+}
+
+const request = (url: string, body?: unknown) =>
   new Request(url, {
     method: body === undefined ? "GET" : "POST",
-    headers: {
-      ...(cookie === undefined ? {} : { cookie }),
-      ...(body === undefined ? {} : { "content-type": "application/json" }),
-    },
+    headers: body === undefined ? {} : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 
 describe("/api/lockers", () => {
-  let adminCookie: string
-  let agentCookie: string
   let stationId: string
+
+  const locker = (label: string) => ({ stationId, sizeCode: "S", label })
 
   beforeAll(async () => {
     await db
@@ -68,16 +65,12 @@ describe("/api/lockers", () => {
       .values({ name: "Route Test Station", address: "1 Test Street" })
       .returning()
     stationId = created.id
-
-    adminCookie = await signUp("route-admin@example.test", "admin")
-    agentCookie = await signUp("route-agent@example.test", "agent")
   })
 
   afterAll(async () => {
     await pool.query("DELETE FROM locker")
     await pool.query("DELETE FROM station")
     await pool.query("DELETE FROM locker_size")
-    await pool.query(`DELETE FROM "user" WHERE email LIKE '%@example.test'`)
     await pool.end()
     // The handlers pull in the composition root, which opens the application's
     // own pool. Left open, Jest hangs — and `--forceExit` would hide it.
@@ -86,22 +79,37 @@ describe("/api/lockers", () => {
 
   describe("GET", () => {
     it("refuses a caller with no session at all", async () => {
-      const response = await GET(request("http://test/api/lockers"))
+      signedOut()
 
-      expect(response.status).toBe(401)
+      expect((await GET(request("http://test/api/lockers"))).status).toBe(401)
     })
 
-    it("lets any signed-in person read the list", async () => {
-      const response = await GET(
-        request("http://test/api/lockers", agentCookie)
-      )
+    it("answers a signed-in reader with the wire shape, not the entity", async () => {
+      signedInAs("admin")
+      await POST(request("http://test/api/lockers", locker("R1")))
+      signedInAs("agent")
+
+      const response = await GET(request("http://test/api/lockers"))
+      const body = await response.json()
 
       expect(response.status).toBe(200)
+      // The contract, not the count: a `Locker` serialised directly would put
+      // a value object's private shape on the wire, one rename from breaking
+      // every client. Any role may read — an agent needs to see availability.
+      expect(body).toContainEqual(
+        expect.objectContaining({
+          label: "R1",
+          status: "available",
+          size: expect.objectContaining({ code: "S", rank: 1 }),
+        })
+      )
     })
 
     it("answers 400, not 500, for a stationId that is not a uuid", async () => {
+      signedInAs("agent")
+
       const response = await GET(
-        request("http://test/api/lockers?stationId=not-a-uuid", agentCookie)
+        request("http://test/api/lockers?stationId=not-a-uuid")
       )
 
       // Postgres would call this "invalid input syntax" and the server would
@@ -112,14 +120,15 @@ describe("/api/lockers", () => {
   })
 
   describe("POST", () => {
-    const locker = (label: string) => ({ stationId, sizeCode: "S", label })
-
     it("answers 401 unauthenticated and 403 for the wrong role", async () => {
+      signedOut()
       const anonymous = await POST(
-        request("http://test/api/lockers", undefined, locker("X1"))
+        request("http://test/api/lockers", locker("X1"))
       )
+
+      signedInAs("agent")
       const asAgent = await POST(
-        request("http://test/api/lockers", agentCookie, locker("X2"))
+        request("http://test/api/lockers", locker("X2"))
       )
 
       // The distinction is the point: 403 tells a caller that signing in
@@ -129,8 +138,10 @@ describe("/api/lockers", () => {
     })
 
     it("creates a locker for an admin", async () => {
+      signedInAs("admin")
+
       const response = await POST(
-        request("http://test/api/lockers", adminCookie, locker("A1"))
+        request("http://test/api/lockers", locker("A1"))
       )
 
       expect(response.status).toBe(201)
@@ -142,24 +153,39 @@ describe("/api/lockers", () => {
     })
 
     it("answers 409 for a label already used at that station", async () => {
-      await POST(request("http://test/api/lockers", adminCookie, locker("B1")))
+      signedInAs("admin")
+      await POST(request("http://test/api/lockers", locker("B1")))
 
-      const again = await POST(
-        request("http://test/api/lockers", adminCookie, locker("B1"))
-      )
+      const again = await POST(request("http://test/api/lockers", locker("B1")))
 
       expect(again.status).toBe(409)
     })
 
     it("answers 400 for a body that is missing a label", async () => {
+      signedInAs("admin")
+
       const response = await POST(
-        request("http://test/api/lockers", adminCookie, {
-          stationId,
-          sizeCode: "S",
-        })
+        request("http://test/api/lockers", { stationId, sizeCode: "S" })
       )
 
       expect(response.status).toBe(400)
+    })
+
+    it("stamps the acting admin on the row it created", async () => {
+      signedInAs("admin")
+
+      const response = await POST(
+        request("http://test/api/lockers", locker("C1"))
+      )
+      const created = await response.json()
+
+      const row = await pool.query(
+        "SELECT created_by FROM locker WHERE id = $1",
+        [created.id]
+      )
+      // The audit context reached the repository from the session, which is
+      // the whole path `AuditContext` exists for.
+      expect(row.rows[0].created_by).toBe(ADMIN_ID)
     })
   })
 })

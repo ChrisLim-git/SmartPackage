@@ -87,9 +87,11 @@ There is no `src/presentation`: Next _is_ the frontend, so the presentation laye
 
 The direction is not conveyed by the folder names, so it is enforced instead: `pnpm lint` fails the build on a wrong-direction import, and each rule was verified by writing the violation and watching it be rejected.
 
-`app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. **There is no separate use-case layer** — a route handler orchestrates directly, calling the domain's rules and the repositories it needs, with every concrete implementation wired in `container.ts`.
+`app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. **There is no separate use-case layer.** A handler guards, validates, delegates and maps — nothing else. Every concrete implementation it delegates to is wired in `container.ts`.
 
-The trade that buys: one less indirection to read, and a handler that shows the whole flow in one file. The trade it costs: orchestration lives in a framework file, so the tests that cover it are route tests. They stay fast by mocking `container` with the in-memory repositories in `test/doubles/` — the same fakes a use-case test would have used, one level out.
+**The behaviour lives in `src/domain/services/`**, and it can, because the repository and `UnitOfWork` contracts live in `src/domain/interfaces/`. A domain service orchestrating a whole flow still imports nothing outside the domain, so storing and retrieving a package are tested the same way a fee calculation is: no database, no HTTP, no framework, in milliseconds. The in-memory repositories in `test/doubles/` are what make that possible.
+
+That is the payoff from putting the contracts in the domain rather than a layer above it. A flow that needs a repository does not need to leave.
 
 Aliases: `@domain/*`, `@dtos/*`, `@infrastructure/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
 

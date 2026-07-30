@@ -78,6 +78,22 @@ This is not decoration. The load-bearing rules — locker allocation, fee tierin
 
 Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
 
+### Where a business rule goes
+
+`entities/`, `value-objects/` and `policies/` are one layer, not three. Clean architecture's inner circle is "enterprise business rules"; how that circle is subdivided is a cohesion question, and the answer here is a single rule with three outcomes:
+
+| Ask                                                                             | Home             | Because                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Is this about one **value** being well-formed, or two of them combining?        | **value object** | It has no identity and no lifecycle. `Money` cannot be negative and never rounds twice; `PricingConfig` cannot have a gap in its bands. Enforced at construction, so nothing downstream can hold a malformed one. |
+| Is this "may this **thing** move from state A to state B?"                      | **entity**       | It has identity and a lifecycle, and the rule is an invariant that must hold for its whole life. `Locker.occupy` refuses an occupied locker; `Package.retrieve` refuses a second collection.                      |
+| Could the specification plausibly ask for a **different version** of this rule? | **policy**       | Strategy. Swapping it must not require editing an entity.                                                                                                                                                         |
+
+The third row is the one that looks like scattering and isn't. The brief's own stretch goals ask for alternative rules — fit by dimensions instead of by rank, a base rate that varies by size. With `fits()` written into `Locker`, each of those is surgery on the entity that holds the system's core invariant. As a policy it is a new class and one line of wiring, and `Locker` is never reopened.
+
+So `Locker` knows _whether it may be occupied_ (invariant, always true, never varies) while `OrdinalFitPolicy` knows _whether a package fits it_ (a rule the brief offers alternatives to). Both are business logic; only one of them is allowed to change.
+
+An entity holding no behaviour would be the actual architectural failure here — an anemic model, where `locker.status = 'occupied'` is assignable from anywhere and the invariant is enforced by whoever remembers to check.
+
 ### Interfaces
 
 Every source of non-determinism is an interface, which is why the domain tests need no mocking framework:

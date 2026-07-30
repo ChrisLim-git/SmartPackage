@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 
 import { Locker } from "@domain/entities/locker"
 import type { AuditContext } from "@domain/interfaces/audit-context"
@@ -134,18 +134,60 @@ export class LockerRepository extends BaseRepository<typeof locker> {
     return rows.map((row) => this.toEntity(row))
   }
 
+  /**
+   * One statement: pick the smallest free locker that fits and take it.
+   *
+   * The subquery holds a row lock — `FOR UPDATE OF l SKIP LOCKED` — so two agents
+   * storing at the same station in the same moment do not both read the same free
+   * locker and both write to it. `SKIP LOCKED` is what makes the loser take the
+   * *next* locker instead of waiting for a row it is going to lose anyway, which
+   * is why twenty concurrent stores against three lockers yield exactly three
+   * packages and seventeen honest refusals rather than a deadlock.
+   *
+   * A read followed by a write cannot do this, whatever it is wrapped in: both
+   * transactions see `available` at the same instant. That is why the interface
+   * has one method with a business name rather than a `find` and a `save`.
+   *
+   * The fit rule is expressed as `size.rank >= required` here, and as
+   * `OrdinalFitService` in the domain. That duplication is deliberate and it is
+   * the price of atomicity — a claim that consulted the domain would be a read
+   * and then a write again. `SmallestFitFirstService` orders candidates the same
+   * way (`rank` then `label`), so the two agree on which locker; the in-memory
+   * repository delegates to the real service precisely so a disagreement shows
+   * up as a failing domain test rather than as a locker chosen differently in
+   * production.
+   */
   async claimSmallestFitting(
-    _stationId: string,
-    _size: PackageSize,
-    _actor: AuditContext
+    stationId: string,
+    size: PackageSize,
+    actor: AuditContext
   ): Promise<Locker | null> {
-    // Deliberately unimplemented until T501. A correct version needs
-    // `FOR UPDATE SKIP LOCKED` inside a transaction; a version written from
-    // `findAvailableAtStation` plus a write would pass every test in this
-    // ticket and lose a locker the first time two agents stored at once.
-    // Failing loudly is the honest placeholder — a silently wrong claim is the
-    // exact bug this method exists to prevent.
-    throw new Error("claimSmallestFitting arrives with the atomic claim (T501)")
+    const claim = await this.query.execute<{ id: string }>(sql`
+      UPDATE ${locker}
+         SET status = 'occupied',
+             updated_by = ${actor.actingUserId},
+             updated_at = now()
+       WHERE id = (
+             SELECT l.id
+               FROM ${locker} l
+               JOIN ${lockerSize} s ON s.id = l.size_id
+              WHERE l.station_id = ${stationId}
+                AND l.status = 'available'
+                AND l.deleted_at IS NULL
+                AND s.deleted_at IS NULL
+                AND s.rank >= ${size.rank}
+              ORDER BY s.rank ASC, l.label ASC
+                FOR UPDATE OF l SKIP LOCKED
+              LIMIT 1
+       )
+      RETURNING id
+    `)
+
+    const claimed = claim.rows[0]
+
+    // Nothing free fits, or every candidate is locked by another store in
+    // flight. Both are ordinary outcomes, and neither is an error.
+    return claimed === undefined ? null : this.findById(claimed.id)
   }
 
   async release(lockerId: string, actor: AuditContext): Promise<void> {

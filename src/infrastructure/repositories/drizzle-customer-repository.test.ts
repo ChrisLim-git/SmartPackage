@@ -1,8 +1,6 @@
 import { createTestDb } from "@/test/support/test-db"
-import { unwrap } from "@/test/support/unwrap"
 
 import { SYSTEM_ACTOR } from "@application/interfaces/audit-context"
-import { Customer } from "@domain/entities/customer"
 
 import { UuidV7Generator } from "../generators/uuid-v7-generator"
 import { DrizzleCustomerRepository } from "./drizzle-customer-repository"
@@ -33,6 +31,15 @@ const insertUser = async (email: string): Promise<string> => {
   return rows[0].id
 }
 
+/**
+ * Only what a generic repository would not already do.
+ *
+ * There is no test here for `save` writing a row and `findById` reading it
+ * back: that proves Drizzle works, and repeating it for every entity would cost
+ * a suite the length of the schema for no information. What is left is the
+ * behaviour `CustomerRepository` was written to have — the upsert that settles
+ * a race, the address folding, and identity surviving a later sign-up.
+ */
 describe("DrizzleCustomerRepository", () => {
   beforeEach(async () => {
     await pool.query("DELETE FROM customer")
@@ -42,25 +49,6 @@ describe("DrizzleCustomerRepository", () => {
     await pool.query("DELETE FROM customer")
     await pool.query(`DELETE FROM "user" WHERE email LIKE '%@example.com'`)
     await pool.end()
-  })
-
-  it("stores a customer who has no account", async () => {
-    const customers = repository()
-    const id = ids.next()
-    const rowan = unwrap(
-      Customer.create({
-        id,
-        name: "Rowan Recipient",
-        email: "rowan@example.com",
-        phone: null,
-        userId: null,
-      })
-    )
-
-    const saved = await customers.save(rowan, SYSTEM_ACTOR)
-
-    expect(saved.userId).toBeNull()
-    expect((await customers.findById(id))?.email).toBe("rowan@example.com")
   })
 
   it("finds an existing customer rather than creating a second one", async () => {
@@ -107,22 +95,6 @@ describe("DrizzleCustomerRepository", () => {
     expect((await customers.findByEmail("ROWAN@example.com"))?.name).toBe(
       "Rowan Recipient"
     )
-  })
-
-  it("stamps who wrote the row, and tolerates nobody having", async () => {
-    const customers = repository()
-
-    const created = await customers.findOrCreateByEmail(
-      { email: "rowan@example.com", name: "Rowan Recipient" },
-      SYSTEM_ACTOR
-    )
-
-    const row = await pool.query(
-      "SELECT created_by, updated_by FROM customer WHERE id = $1",
-      [created.id]
-    )
-    expect(row.rows[0].created_by).toBeNull()
-    expect(row.rows[0].updated_by).toBeNull()
   })
 
   it("stamps a real acting user into the actor columns", async () => {

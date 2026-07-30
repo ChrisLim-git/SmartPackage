@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useStorePackage } from "@/hooks/use-packages"
+import { useStorePackage } from "@/hooks/use-store-package"
 import { cn } from "@/lib/utils"
 
 /** The same shape the route validates, so both sides reject the same thing. */

@@ -81,7 +81,7 @@ src/
 app/                   route handlers + pages — the controllers
 components/            React components — the presentation layer
 components/ui/  lib/   shadcn primitives. Leaves, not a layer.
-hooks/                 every TanStack Query call in the app, and nothing else
+hooks/                 every TanStack Query call, one hook per file
 utils/                 test doubles and fixtures — in-memory repositories,
                        stub generators, the test-database pool
 ```

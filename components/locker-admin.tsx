@@ -22,12 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  useCreateLocker,
-  useLockers,
-  useLockerSizes,
-  useStations,
-} from "@/hooks/use-master-data"
+import { useCreateLocker } from "@/hooks/use-create-locker"
+import { useLockers } from "@/hooks/use-lockers"
+import { useLockerSizes } from "@/hooks/use-locker-sizes"
+import { useStations } from "@/hooks/use-stations"
 
 import { CreateLockerDialog } from "./create-locker-dialog"
 

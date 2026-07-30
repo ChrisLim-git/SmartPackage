@@ -17,7 +17,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp"
-import { useCollectPackage } from "@/hooks/use-packages"
+import { useCollectPackage } from "@/hooks/use-collect-package"
 
 const schema = z.object({
   pickupCode: z.string().regex(/^\d{6}$/, "Enter all six digits"),

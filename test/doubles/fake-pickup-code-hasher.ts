@@ -10,7 +10,15 @@ import type { PickupCode } from "@domain/value-objects/pickup-code"
  */
 export class FakePickupCodeHasher implements PickupCodeHasher {
   hash(code: PickupCode): string {
-    return `hashed:${code.toString()}`
+    // Each digit shifted into a letter. Deterministic and collision-free like
+    // the real thing, and — the part that matters — the plaintext is not a
+    // substring of the result, so a test can assert that no field of an entity
+    // is holding the code in the clear.
+    const shifted = Array.from(code.toString(), (digit) =>
+      String.fromCharCode("a".charCodeAt(0) + Number(digit))
+    ).join("")
+
+    return `fake-hash:${shifted}`
   }
 
   matches(code: PickupCode, storedHash: string): boolean {

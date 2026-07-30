@@ -10,6 +10,6 @@ import type { LockerSize, PackageSize } from "../utils/size"
  * without touching the entity or any use case. The ordinal implementation
  * arrives with its own ticket.
  */
-export interface LockerFitPolicy {
+export interface LockerFitService {
   fits(capacity: LockerSize, requirement: PackageSize): boolean
 }

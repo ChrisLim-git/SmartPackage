@@ -109,11 +109,11 @@ Domain **tests** carry one narrower exemption: they may write `new Date("2026-01
 | ------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Is this about one **value** being well-formed, or two of them combining?        | **value object** | It has no identity and no lifecycle. `Money` cannot be negative and never rounds twice; `PricingConfig` cannot have a gap in its bands. Enforced at construction, so nothing downstream can hold a malformed one. |
 | Is this "may this **thing** move from state A to state B?"                      | **entity**       | It has identity and a lifecycle, and the rule is an invariant that must hold for its whole life. `Locker.occupy` refuses an occupied locker; `Package.retrieve` refuses a second collection.                      |
-| Could the specification plausibly ask for a **different version** of this rule? | **policy**       | Strategy. Swapping it must not require editing an entity.                                                                                                                                                         |
+| Could the specification plausibly ask for a **different version** of this rule? | **service**      | Strategy. Swapping it must not require editing an entity.                                                                                                                                                         |
 
-The third row is the one that looks like scattering and isn't. The brief's own stretch goals ask for alternative rules — fit by dimensions instead of by rank, a base rate that varies by size. With `fits()` written into `Locker`, each of those is surgery on the entity that holds the system's core invariant. As a policy it is a new class and one line of wiring, and `Locker` is never reopened.
+The third row is the one that looks like scattering and isn't. The brief's own stretch goals ask for alternative rules — fit by dimensions instead of by rank, a base rate that varies by size. With `fits()` written into `Locker`, each of those is surgery on the entity that holds the system's core invariant. As a service it is a new class and one line of wiring, and `Locker` is never reopened.
 
-So `Locker` knows _whether it may be occupied_ (invariant, always true, never varies) while `OrdinalFitPolicy` knows _whether a package fits it_ (a rule the brief offers alternatives to). Both are business logic; only one of them is allowed to change.
+So `Locker` knows _whether it may be occupied_ (invariant, always true, never varies) while `OrdinalFitService` knows _whether a package fits it_ (a rule the brief offers alternatives to). Both are business logic; only one of them is allowed to change.
 
 An entity holding no behaviour would be the actual architectural failure here — an anemic model, where `locker.status = 'occupied'` is assignable from anywhere and the invariant is enforced by whoever remembers to check.
 
@@ -121,15 +121,15 @@ An entity holding no behaviour would be the actual architectural failure here �
 
 Every source of non-determinism is an interface, which is why the domain tests need no mocking framework:
 
-| Interface                                                        | Declared in | Real                                            | Test double                               |
-| ---------------------------------------------------------------- | ----------- | ----------------------------------------------- | ----------------------------------------- |
-| `Clock`                                                          | domain      | `SystemClock`                                   | `FixedClock(instant)`, `AdvanceableClock` |
-| `IdGenerator`                                                    | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`                   |
-| `PickupCodeGenerator`                                            | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
-| `PickupCodeHasher`                                               | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
-| `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
-| `*Repository`, `UnitOfWork`                                      | domain      | Drizzle                                         | in-memory fakes                           |
-| `Notifier`                                                       | domain      | `LoggingNotifier`                               | `RecordingNotifier`                       |
+| Interface                                                           | Declared in | Real                                            | Test double                               |
+| ------------------------------------------------------------------- | ----------- | ----------------------------------------------- | ----------------------------------------- |
+| `Clock`                                                             | domain      | `SystemClock`                                   | `FixedClock(instant)`, `AdvanceableClock` |
+| `IdGenerator`                                                       | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`                   |
+| `PickupCodeGenerator`                                               | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
+| `PickupCodeHasher`                                                  | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
+| `LockerFitService` / `LockerSelectionService` / `StorageFeeService` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
+| `*Repository`, `UnitOfWork`                                         | domain      | Drizzle                                         | in-memory fakes                           |
+| `Notifier`                                                          | domain      | `LoggingNotifier`                               | `RecordingNotifier`                       |
 
 `Notifier` exists to make a boundary that is out of scope _visible_ rather than absent.
 
@@ -158,7 +158,7 @@ The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" 
 
 ### Patterns used, and refused
 
-**Strategy** for the three policies, so ordinal fit can become dimensional fit without touching a use case. **Repository + Unit of Work**, for testability and to give the transaction boundary an explicit owner. **Value Object**, so validity is enforced at construction and no use case ever sees a malformed code or a negative amount.
+**Strategy** for the three domain services, so ordinal fit can become dimensional fit without reopening an entity. **Repository + Unit of Work**, for testability and to give the transaction boundary an explicit owner. **Value Object**, so validity is enforced at construction and nothing downstream ever sees a malformed code or a negative amount.
 
 Deliberately absent: builder hierarchies for two entities, an event bus for one out-of-scope notification, CQRS at this scale, repository decorators with nothing to cross-cut. The absence is the point — each of those would be ceremony here.
 

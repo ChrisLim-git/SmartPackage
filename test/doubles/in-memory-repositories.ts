@@ -13,8 +13,8 @@ import { Locker } from "@domain/entities/locker"
 import type { Package } from "@domain/entities/package"
 import type { Station } from "@domain/entities/station"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
-import { OrdinalFitPolicy } from "@domain/services/ordinal-fit-policy"
-import { SmallestFitFirstPolicy } from "@domain/services/smallest-fit-first-policy"
+import { OrdinalFitService } from "@domain/services/ordinal-fit-service"
+import { SmallestFitFirstService } from "@domain/services/smallest-fit-first-service"
 import { isErr } from "@domain/shared/result"
 import type { PricingConfig } from "@domain/utils/pricing-config"
 import type { LockerSize, PackageSize } from "@domain/utils/size"
@@ -51,8 +51,8 @@ export class InMemoryLockerRepository implements LockerRepository {
    * green — and the fast tests would be confirming a rule the system does not
    * follow.
    */
-  private readonly selection = new SmallestFitFirstPolicy(
-    new OrdinalFitPolicy()
+  private readonly selection = new SmallestFitFirstService(
+    new OrdinalFitService()
   )
 
   constructor(

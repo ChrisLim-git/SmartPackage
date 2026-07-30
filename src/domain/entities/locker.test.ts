@@ -1,6 +1,6 @@
 import { unwrap } from "@/test/support/unwrap"
 
-import type { LockerFitPolicy } from "../services/locker-fit-policy"
+import type { LockerFitService } from "../services/locker-fit-service"
 import { isErr, isOk } from "../shared/result"
 import { LockerSize, PackageSize } from "../utils/size"
 import { Locker } from "./locker"
@@ -25,8 +25,8 @@ const aLocker = (): Locker =>
     })
   )
 
-/** Stands in for the real ordinal policy, which arrives with its own ticket. */
-const rankFit: LockerFitPolicy = {
+/** Stands in for the real ordinal service, which arrives with its own ticket. */
+const rankFit: LockerFitService = {
   fits: (capacity, requirement) => capacity.rank >= requirement.rank,
 }
 
@@ -138,7 +138,7 @@ describe("Locker", () => {
   })
 
   describe("capacity", () => {
-    it("asks the fit policy rather than comparing sizes itself", () => {
+    it("asks the fit service rather than comparing sizes itself", () => {
       const locker = aLocker()
 
       expect(locker.canAccommodate(SMALL_PACKAGE, rankFit)).toBe(true)
@@ -147,16 +147,16 @@ describe("Locker", () => {
 
     it("answers on capacity alone, not on whether it is free", () => {
       // Capacity and availability are different questions; the selection
-      // policy is what combines them.
+      // service is what combines them.
       const occupied = unwrap(aLocker().occupy("package-1"))
 
       expect(occupied.canAccommodate(SMALL_PACKAGE, rankFit)).toBe(true)
     })
 
-    it("takes a different policy without changing", () => {
+    it("takes a different fit service without changing", () => {
       // Strategy, demonstrated: dimensional fit can replace ordinal fit and
       // the entity does not change.
-      const nothingFits: LockerFitPolicy = { fits: () => false }
+      const nothingFits: LockerFitService = { fits: () => false }
 
       expect(aLocker().canAccommodate(SMALL_PACKAGE, nothingFits)).toBe(false)
     })

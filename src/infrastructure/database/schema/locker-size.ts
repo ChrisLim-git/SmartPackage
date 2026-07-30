@@ -5,7 +5,7 @@ import { auditColumns, primaryId } from "./columns"
 /**
  * The size ladder, held as data rather than as an enum.
  *
- * `rank` carries the entire ordering rule — `OrdinalFitPolicy` compares ranks
+ * `rank` carries the entire ordering rule — `OrdinalFitService` compares ranks
  * and nothing else — so introducing an XL is an `INSERT`, not a deployment.
  *
  * One ladder serves both lockers and packages. A separate `package_size` table

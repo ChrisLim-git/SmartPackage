@@ -3,9 +3,9 @@ import { unwrap } from "@/test/support/unwrap"
 import { Locker } from "../entities/locker"
 import { isErr, isOk } from "../shared/result"
 import { LockerSize, PackageSize } from "../utils/size"
-import type { LockerFitPolicy } from "./locker-fit-policy"
-import { OrdinalFitPolicy } from "./ordinal-fit-policy"
-import { SmallestFitFirstPolicy } from "./smallest-fit-first-policy"
+import type { LockerFitService } from "./locker-fit-service"
+import { OrdinalFitService } from "./ordinal-fit-service"
+import { SmallestFitFirstService } from "./smallest-fit-first-service"
 
 const lockerSize = (code: string, rank: number): LockerSize =>
   unwrap(LockerSize.create({ code, rank, label: `${code} locker` }))
@@ -31,8 +31,8 @@ const aLocker = (
 const occupied = (locker: Locker): Locker =>
   unwrap(locker.occupy(`package-in-${locker.label}`))
 
-describe("OrdinalFitPolicy", () => {
-  const fit = new OrdinalFitPolicy()
+describe("OrdinalFitService", () => {
+  const fit = new OrdinalFitService()
 
   it("puts a small package in anything", () => {
     expect(fit.fits(S, smallPackage)).toBe(true)
@@ -52,8 +52,8 @@ describe("OrdinalFitPolicy", () => {
   })
 })
 
-describe("SmallestFitFirstPolicy", () => {
-  const select = new SmallestFitFirstPolicy(new OrdinalFitPolicy())
+describe("SmallestFitFirstService", () => {
+  const select = new SmallestFitFirstService(new OrdinalFitService())
 
   it("prefers the smallest locker when everything is free", () => {
     const candidates = [aLocker("L1", L), aLocker("S1", S), aLocker("M1", M)]
@@ -128,7 +128,7 @@ describe("SmallestFitFirstPolicy", () => {
   })
 
   it("considers every candidate it is given, station or not", () => {
-    // The policy never learns that stations exist. Scoping the candidate set
+    // The service never learns that stations exist. Scoping the candidate set
     // is the caller's job, which is what keeps the domain free of a
     // repository query.
     const candidates = [
@@ -142,12 +142,12 @@ describe("SmallestFitFirstPolicy", () => {
     if (isOk(chosen)) expect(chosen.value.stationId).toBe("station-1")
   })
 
-  it("genuinely defers to the fit policy it was given", () => {
+  it("genuinely defers to the fit service it was given", () => {
     // The proof that the strategy is real rather than decorative: swap in a
-    // policy that accepts nothing and selection finds nothing, without the
+    // service that accepts nothing and selection finds nothing, without the
     // selection logic changing.
-    const nothingFits: LockerFitPolicy = { fits: () => false }
-    const fussy = new SmallestFitFirstPolicy(nothingFits)
+    const nothingFits: LockerFitService = { fits: () => false }
+    const fussy = new SmallestFitFirstService(nothingFits)
 
     expect(isErr(fussy.select([aLocker("L1", L)], smallPackage))).toBe(true)
   })

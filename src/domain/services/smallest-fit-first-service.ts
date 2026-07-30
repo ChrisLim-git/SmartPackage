@@ -5,8 +5,8 @@ import {
 } from "../shared/errors"
 import { err, ok, type Result } from "../shared/result"
 import type { PackageSize } from "../utils/size"
-import type { LockerFitPolicy } from "./locker-fit-policy"
-import type { LockerSelectionPolicy } from "./locker-selection-policy"
+import type { LockerFitService } from "./locker-fit-service"
+import type { LockerSelectionService } from "./locker-selection-service"
 
 /**
  * Picks the smallest free locker that can hold the package.
@@ -19,8 +19,8 @@ import type { LockerSelectionPolicy } from "./locker-selection-policy"
  * Ties break on label so the same candidate set always yields the same locker.
  * Left to the order rows came back in, one request would answer two ways.
  */
-export class SmallestFitFirstPolicy implements LockerSelectionPolicy {
-  constructor(private readonly fitPolicy: LockerFitPolicy) {}
+export class SmallestFitFirstService implements LockerSelectionService {
+  constructor(private readonly fitService: LockerFitService) {}
 
   select(
     candidates: readonly Locker[],
@@ -29,7 +29,7 @@ export class SmallestFitFirstPolicy implements LockerSelectionPolicy {
     const usable = candidates.filter(
       (locker) =>
         locker.isAvailable() &&
-        locker.canAccommodate(requirement, this.fitPolicy)
+        locker.canAccommodate(requirement, this.fitService)
     )
 
     // `filter` already copied, so sorting here cannot reorder the caller's array.
@@ -39,7 +39,7 @@ export class SmallestFitFirstPolicy implements LockerSelectionPolicy {
         (a.label < b.label ? -1 : a.label > b.label ? 1 : 0)
     )
 
-    // No station id: this policy was never told which station these lockers
+    // No station id: this service was never told which station these lockers
     // belong to, and inventing one for the message would be a lie.
     return best === undefined ? err(noSuitableLockerAvailable()) : ok(best)
   }

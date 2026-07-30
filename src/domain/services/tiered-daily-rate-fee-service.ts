@@ -3,7 +3,7 @@ import { MULTIPLIER_SCALE } from "../utils/fee-tier"
 import type { Money } from "../utils/money"
 import type { PricingConfig } from "../utils/pricing-config"
 import type { StorageDuration } from "../utils/storage-duration"
-import type { StorageFeePolicy } from "./storage-fee-policy"
+import type { StorageFeeService } from "./storage-fee-service"
 
 /**
  * Charges each band at its own rate and adds the bands up.
@@ -17,7 +17,7 @@ import type { StorageFeePolicy } from "./storage-fee-policy"
  * once, at the end. Rounding each band instead would collect up to half a cent
  * of error per band, in the operator's favour every time.
  */
-export class TieredDailyRateFeePolicy implements StorageFeePolicy {
+export class TieredDailyRateFeeService implements StorageFeeService {
   calculate(duration: StorageDuration, pricing: PricingConfig): Money {
     const weighted = pricing.tiers.reduce(
       (total, tier) =>

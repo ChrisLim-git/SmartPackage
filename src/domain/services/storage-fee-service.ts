@@ -10,6 +10,6 @@ import type { StorageDuration } from "../utils/storage-duration"
  * per-size, promotional) is a different implementation of this interface, not
  * an edit to the one below.
  */
-export interface StorageFeePolicy {
+export interface StorageFeeService {
   calculate(duration: StorageDuration, pricing: PricingConfig): Money
 }

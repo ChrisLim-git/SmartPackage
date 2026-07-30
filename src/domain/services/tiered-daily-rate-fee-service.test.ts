@@ -4,7 +4,7 @@ import { Money } from "../utils/money"
 import { FeeTier } from "../utils/fee-tier"
 import { PricingConfig } from "../utils/pricing-config"
 import { StorageDuration } from "../utils/storage-duration"
-import { TieredDailyRateFeePolicy } from "./tiered-daily-rate-fee-policy"
+import { TieredDailyRateFeeService } from "./tiered-daily-rate-fee-service"
 
 const DAY = 24 * 60 * 60 * 1_000
 const STORED_AT = new Date("2026-01-01T00:00:00.000Z")
@@ -32,11 +32,11 @@ const STANDARD = pricing("2.00", [
   tier(11, null, 3),
 ])
 
-describe("TieredDailyRateFeePolicy", () => {
-  const policy = new TieredDailyRateFeePolicy()
+describe("TieredDailyRateFeeService", () => {
+  const service = new TieredDailyRateFeeService()
 
   const feeFor = (days: number, config = STANDARD): string =>
-    policy.calculate(stay(days), config).toDecimalString()
+    service.calculate(stay(days), config).toDecimalString()
 
   describe("the worked example", () => {
     it.each([
@@ -108,7 +108,7 @@ describe("TieredDailyRateFeePolicy", () => {
     })
 
     it("returns Money, never a number", () => {
-      const fee = policy.calculate(stay(3), STANDARD)
+      const fee = service.calculate(stay(3), STANDARD)
 
       expect(fee).toBeInstanceOf(Money)
       expect(fee.toMinorUnits()).toBe(600)
@@ -116,7 +116,7 @@ describe("TieredDailyRateFeePolicy", () => {
 
     it("never returns a negative fee", () => {
       expect(
-        policy.calculate(stay(1), STANDARD).toMinorUnits()
+        service.calculate(stay(1), STANDARD).toMinorUnits()
       ).toBeGreaterThanOrEqual(0)
     })
   })

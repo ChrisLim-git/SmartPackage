@@ -1,5 +1,5 @@
 import { type MalformedInput, malformedInput } from "../shared/errors"
-import { err, ok, type Result } from "../shared/result"
+import { err, isErr, ok, type Result } from "../shared/result"
 
 /** Multipliers are held in hundredths, so ×1.5 is 150 and the arithmetic stays integral. */
 export const MULTIPLIER_SCALE = 100
@@ -71,6 +71,35 @@ export class FeeTier {
     return ok(
       new FeeTier(fromDay, toDay, Math.round(multiplier * MULTIPLIER_SCALE))
     )
+  }
+
+  /**
+   * Rebuilds a tier from the hundredths a repository read back.
+   *
+   * The database stores what this object stores, so going in through `create`
+   * would mean dividing by 100 to produce a decimal that is immediately
+   * multiplied by 100 again — a float round trip for a number that was already
+   * the right integer.
+   */
+  static fromHundredths(attributes: {
+    readonly fromDay: number
+    readonly toDay: number | null
+    readonly multiplierHundredths: number
+  }): Result<FeeTier, MalformedInput> {
+    const { fromDay, toDay, multiplierHundredths } = attributes
+
+    if (!Number.isInteger(multiplierHundredths) || multiplierHundredths < 0) {
+      return err(
+        malformedInput("fee tier", "a multiplier must not be negative")
+      )
+    }
+
+    // Reuses `create` for the day validation, then swaps in the exact integer.
+    const validated = FeeTier.create({ fromDay, toDay, multiplier: 1 })
+
+    return isErr(validated)
+      ? validated
+      : ok(new FeeTier(fromDay, toDay, multiplierHundredths))
   }
 
   get isUnbounded(): boolean {

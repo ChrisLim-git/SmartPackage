@@ -20,6 +20,16 @@ const config = {
   // Set once here rather than per script, so `test:unit` and `test:integration`
   // also exit 0 while their layers are still empty.
   passWithNoTests: true,
+  // One worker, because the integration suites share a single Postgres
+  // database and several of them clear tables they did not exclusively create.
+  // Run in parallel, one suite's cleanup lands in the middle of another's
+  // assertions and the failure looks random — the worst kind of test to debug,
+  // and the kind that gets rerun until it passes.
+  //
+  // The alternative is a database per worker, which is real isolation and the
+  // right answer for a suite that runs for minutes. This one runs in about a
+  // second, so the parallelism buys nothing worth that machinery.
+  maxWorkers: 1,
   // Per worker, before the test file is imported — not `globalSetup`, which
   // runs in a process the workers do not inherit `process.env` from.
   setupFiles: ["<rootDir>/jest.env-setup.mjs"],

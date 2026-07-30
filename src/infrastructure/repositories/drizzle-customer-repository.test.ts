@@ -1,8 +1,6 @@
 import { createTestDb } from "@/test/support/test-db"
-import { unwrap } from "@/test/support/unwrap"
 
 import { SYSTEM_ACTOR } from "@application/interfaces/audit-context"
-import { Customer } from "@domain/entities/customer"
 
 import { UuidV7Generator } from "../generators/uuid-v7-generator"
 import { DrizzleCustomerRepository } from "./drizzle-customer-repository"
@@ -16,6 +14,32 @@ const ids = new UuidV7Generator()
 
 const repository = () => new DrizzleCustomerRepository(db, ids)
 
+/**
+ * Inserts an account and returns the id the database gave it.
+ *
+ * The id is never supplied: `user.id` belongs to BetterAuth's configuration,
+ * and a test that hard-codes its shape stops noticing when that shape changes.
+ */
+const insertUser = async (email: string): Promise<string> => {
+  const { rows } = await pool.query(
+    `INSERT INTO "user" (name, email, email_verified, created_at, updated_at)
+     VALUES ('Ari Agent', $1, false, now(), now())
+     RETURNING id`,
+    [email]
+  )
+
+  return rows[0].id
+}
+
+/**
+ * Only what a generic repository would not already do.
+ *
+ * There is no test here for `save` writing a row and `findById` reading it
+ * back: that proves Drizzle works, and repeating it for every entity would cost
+ * a suite the length of the schema for no information. What is left is the
+ * behaviour `CustomerRepository` was written to have — the upsert that settles
+ * a race, the address folding, and identity surviving a later sign-up.
+ */
 describe("DrizzleCustomerRepository", () => {
   beforeEach(async () => {
     await pool.query("DELETE FROM customer")
@@ -25,25 +49,6 @@ describe("DrizzleCustomerRepository", () => {
     await pool.query("DELETE FROM customer")
     await pool.query(`DELETE FROM "user" WHERE email LIKE '%@example.com'`)
     await pool.end()
-  })
-
-  it("stores a customer who has no account", async () => {
-    const customers = repository()
-    const id = ids.next()
-    const rowan = unwrap(
-      Customer.create({
-        id,
-        name: "Rowan Recipient",
-        email: "rowan@example.com",
-        phone: null,
-        userId: null,
-      })
-    )
-
-    const saved = await customers.save(rowan, SYSTEM_ACTOR)
-
-    expect(saved.userId).toBeNull()
-    expect((await customers.findById(id))?.email).toBe("rowan@example.com")
   })
 
   it("finds an existing customer rather than creating a second one", async () => {
@@ -92,20 +97,26 @@ describe("DrizzleCustomerRepository", () => {
     )
   })
 
-  it("stamps who wrote the row, and tolerates nobody having", async () => {
+  it("stamps a real acting user into the actor columns", async () => {
     const customers = repository()
+    // The id is read back from `user`, never invented here. Whether the actor
+    // columns can hold a real user id is the entire point of this test, so
+    // writing the shape into it by hand would only test the hand-written
+    // shape. Every other test passes SYSTEM_ACTOR, which is null and fits any
+    // column type — that is how a mismatch stayed invisible for a whole phase.
+    const agentId = await insertUser("ari-agent@example.com")
 
     const created = await customers.findOrCreateByEmail(
       { email: "rowan@example.com", name: "Rowan Recipient" },
-      SYSTEM_ACTOR
+      { actingUserId: agentId }
     )
 
     const row = await pool.query(
       "SELECT created_by, updated_by FROM customer WHERE id = $1",
       [created.id]
     )
-    expect(row.rows[0].created_by).toBeNull()
-    expect(row.rows[0].updated_by).toBeNull()
+    expect(row.rows[0].created_by).toBe(agentId)
+    expect(row.rows[0].updated_by).toBe(agentId)
   })
 
   it("keeps the same row when an account is linked later", async () => {
@@ -116,12 +127,7 @@ describe("DrizzleCustomerRepository", () => {
     )
     // A real account: `user_id` is a foreign key, so an invented id is
     // rejected — which is the constraint doing its job.
-    const accountId = `user-${ids.next()}`
-    await pool.query(
-      `INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
-       VALUES ($1, 'Rowan Recipient', 'rowan-account@example.com', false, now(), now())`,
-      [accountId]
-    )
+    const accountId = await insertUser("rowan-account@example.com")
 
     const linked = await customers.save(created.linkTo(accountId), SYSTEM_ACTOR)
 

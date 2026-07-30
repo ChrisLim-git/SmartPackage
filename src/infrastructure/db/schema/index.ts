@@ -8,3 +8,8 @@
 // and are re-exported here.
 export * from "./auth-schema"
 export * from "./customer"
+export * from "./locker"
+export * from "./locker-size"
+export * from "./package"
+export * from "./pricing"
+export * from "./station"

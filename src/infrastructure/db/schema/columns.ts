@@ -30,6 +30,15 @@ export const primaryId = () =>
  * genuinely have no acting user, and inventing a sentinel account to dodge a
  * null would be the worse design.
  *
+ * They are `uuid`, which holds only because BetterAuth is configured to issue
+ * v7 ids. Its own default is a 32-character base62 string, and a `uuid` column
+ * rejects every one of those — silently survivable, because a null actor fits
+ * either type and a suite that always passes `SYSTEM_ACTOR` never finds out.
+ *
+ * There is deliberately no foreign key to `user`. An audit stamp is a record of
+ * what happened, and a key would force a choice between blocking a deletion and
+ * rewriting history — neither of which is what an audit column is for.
+ *
  * BetterAuth's own tables are exempt — their schema is CLI-generated and
  * editing it invites drift on every regeneration.
  */

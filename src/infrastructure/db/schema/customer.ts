@@ -1,4 +1,4 @@
-import { pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core"
 
 import { user } from "./auth-schema"
 import { auditColumns, primaryId } from "./columns"
@@ -22,7 +22,7 @@ export const customer = pgTable(
     // domain entity enforces that at least one of the two is present.
     email: text("email"),
     phone: text("phone"),
-    userId: text("user_id").references(() => user.id, {
+    userId: uuid("user_id").references(() => user.id, {
       onDelete: "set null",
     }),
     ...auditColumns,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { SignUpForm } from "@presentation/components/sign-up-form"
+import { SignUpForm } from "@presentation/views/sign-up-form"
 
 export const metadata: Metadata = {
   title: "Create an account — Smart Package Locker",

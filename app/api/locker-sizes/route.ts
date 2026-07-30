@@ -1,4 +1,4 @@
-import { toLockerSizeDto } from "@application/dtos/master-data"
+import { toLockerSizeDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, lockerSizes } from "@infrastructure/container"

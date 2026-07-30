@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm"
 
-import type { StationRepository } from "@application/interfaces/station-repository"
+import type { StationRepository } from "@domain/interfaces/station-repository"
 import { Station } from "@domain/entities/station"
 import { isErr } from "@domain/shared/result"
 

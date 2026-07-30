@@ -1,4 +1,4 @@
-import type { Station } from "@domain/entities/station"
+import type { Station } from "../entities/station"
 
 /**
  * Read-only, because nothing in scope creates a station.

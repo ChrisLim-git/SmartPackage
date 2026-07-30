@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm"
 
-import type { PricingRepository } from "@application/interfaces/pricing-repository"
+import type { PricingRepository } from "@domain/interfaces/pricing-repository"
 import { isErr } from "@domain/shared/result"
 import { FeeTier } from "@domain/utils/fee-tier"
 import { Money } from "@domain/utils/money"

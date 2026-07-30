@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 
-import type { AuditContext } from "@application/interfaces/audit-context"
-import type { CustomerRepository } from "@application/interfaces/customer-repository"
+import type { AuditContext } from "@domain/interfaces/audit-context"
+import type { CustomerRepository } from "@domain/interfaces/customer-repository"
 import { Customer } from "@domain/entities/customer"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { isErr } from "@domain/shared/result"

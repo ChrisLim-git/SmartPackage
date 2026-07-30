@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm"
 
-import type { AuditContext } from "@application/interfaces/audit-context"
-import type { LockerRepository } from "@application/interfaces/locker-repository"
+import type { AuditContext } from "@domain/interfaces/audit-context"
+import type { LockerRepository } from "@domain/interfaces/locker-repository"
 import { Locker } from "@domain/entities/locker"
 import { isErr } from "@domain/shared/result"
 import { LockerSize, type PackageSize } from "@domain/utils/size"

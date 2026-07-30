@@ -1,13 +1,13 @@
-import type { AuditContext } from "@application/interfaces/audit-context"
-import type { CustomerRepository } from "@application/interfaces/customer-repository"
-import type { LockerRepository } from "@application/interfaces/locker-repository"
-import type { PackageRepository } from "@application/interfaces/package-repository"
-import type { PricingRepository } from "@application/interfaces/pricing-repository"
-import type { StationRepository } from "@application/interfaces/station-repository"
+import type { AuditContext } from "@domain/interfaces/audit-context"
+import type { CustomerRepository } from "@domain/interfaces/customer-repository"
+import type { LockerRepository } from "@domain/interfaces/locker-repository"
+import type { PackageRepository } from "@domain/interfaces/package-repository"
+import type { PricingRepository } from "@domain/interfaces/pricing-repository"
+import type { StationRepository } from "@domain/interfaces/station-repository"
 import type {
   TransactionalRepositories,
   UnitOfWork,
-} from "@application/interfaces/unit-of-work"
+} from "@domain/interfaces/unit-of-work"
 import { Customer } from "@domain/entities/customer"
 import { Locker } from "@domain/entities/locker"
 import type { Package } from "@domain/entities/package"

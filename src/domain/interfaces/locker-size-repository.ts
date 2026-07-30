@@ -1,4 +1,4 @@
-import type { LockerSize } from "@domain/utils/size"
+import type { LockerSize } from "../utils/size"
 
 /**
  * The size ladder, read-only.

@@ -3,11 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
-import type {
-  LockerDto,
-  LockerSizeDto,
-  StationDto,
-} from "@application/dtos/master-data"
+import type { LockerDto, LockerSizeDto, StationDto } from "@dtos/master-data"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

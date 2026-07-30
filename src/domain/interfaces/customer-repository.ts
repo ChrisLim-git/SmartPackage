@@ -1,4 +1,4 @@
-import type { Customer } from "@domain/entities/customer"
+import type { Customer } from "../entities/customer"
 
 import type { AuditContext } from "./audit-context"
 

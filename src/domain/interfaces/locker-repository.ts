@@ -1,5 +1,5 @@
-import type { Locker } from "@domain/entities/locker"
-import type { PackageSize } from "@domain/utils/size"
+import type { Locker } from "../entities/locker"
+import type { PackageSize } from "../utils/size"
 
 import type { AuditContext } from "./audit-context"
 

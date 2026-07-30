@@ -1,4 +1,4 @@
-import type { PricingConfig } from "@domain/utils/pricing-config"
+import type { PricingConfig } from "../utils/pricing-config"
 
 /**
  * The base rate and its fee table, as one validated object.

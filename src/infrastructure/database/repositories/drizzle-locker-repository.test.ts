@@ -2,7 +2,7 @@ import { createTestDb } from "@/test/support/test-db"
 import { unwrap } from "@/test/support/unwrap"
 import { eq } from "drizzle-orm"
 
-import { SYSTEM_ACTOR } from "@application/interfaces/audit-context"
+import { SYSTEM_ACTOR } from "@domain/interfaces/audit-context"
 import { PackageSize } from "@domain/utils/size"
 
 import { locker } from "../schema/locker"

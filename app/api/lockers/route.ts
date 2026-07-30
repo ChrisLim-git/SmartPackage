@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { toLockerDto } from "@application/dtos/master-data"
+import { toLockerDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, lockers } from "@infrastructure/container"

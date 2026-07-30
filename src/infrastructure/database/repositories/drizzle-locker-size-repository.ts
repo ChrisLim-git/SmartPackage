@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm"
 
-import type { LockerSizeRepository } from "@application/interfaces/locker-size-repository"
+import type { LockerSizeRepository } from "@domain/interfaces/locker-size-repository"
 import { isErr } from "@domain/shared/result"
 import { LockerSize } from "@domain/utils/size"
 

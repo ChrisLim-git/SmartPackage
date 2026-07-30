@@ -65,11 +65,11 @@ src/
 │   ├── entities/      business objects with lifecycles and invariants
 │   ├── utils/         value objects — values that validate themselves at construction
 │   ├── services/      swappable rules — fit, selection, fee (Strategy)
-│   ├── interfaces/    Clock, IdGenerator, PickupCodeGenerator/Hasher
+│   ├── interfaces/    everything the domain needs but will not implement:
+│   │                  Clock, IdGenerator, PickupCode*, repositories, UnitOfWork
 │   └── shared/        Result, error taxonomy
-├── application/       imports domain
-│   ├── dtos/          wire shapes, so entities never reach JSON
-│   ├── interfaces/    repository + UnitOfWork contracts (the SPIs)
+├── dtos/              wire shapes — imports domain; the domain never imports back
+├── application/       imports domain + dtos
 │   └── services/      use cases — orchestration, not rules
 ├── infrastructure/    imports domain + application
 │   ├── database/      drizzle client, schema, migrations, repositories
@@ -78,7 +78,7 @@ src/
 │   ├── security/      pickup code hashing
 │   ├── time/          system clock
 │   └── container.ts   composition root — the only file that knows every concrete type
-└── presentation/      imports application (+ domain types)
+└── presentation/      imports application, domain and dtos
     ├── views/         React components
     └── hooks/
 
@@ -90,11 +90,11 @@ The direction is not conveyed by the folder names, so it is enforced instead: `p
 
 `app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. Handlers stay thin — guard, validate, delegate, map — and every concrete implementation they use is wired in `container.ts`.
 
-Aliases: `@domain/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, and `@/*` for the repo root.
+Aliases: `@domain/*`, `@dtos/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 
-`src/infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
+`src/infrastructure/` sits _below_ the domain and points **up**: the domain declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists — the arrow points inward at the interface, not outward at the driver.
 
 **The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
@@ -127,7 +127,7 @@ Every source of non-determinism is an interface, which is why the domain tests n
 | `PickupCodeGenerator`                                            | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
 | `PickupCodeHasher`                                               | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
-| `*Repository`, `UnitOfWork`                                      | application | Drizzle                                         | in-memory fakes                           |
+| `*Repository`, `UnitOfWork`                                      | domain      | Drizzle                                         | in-memory fakes                           |
 | `Notifier`                                                       | application | `LoggingNotifier`                               | `RecordingNotifier`                       |
 
 `Notifier` exists to make a boundary that is out of scope _visible_ rather than absent.

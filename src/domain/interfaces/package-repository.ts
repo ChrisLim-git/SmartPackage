@@ -1,4 +1,4 @@
-import type { Package } from "@domain/entities/package"
+import type { Package } from "../entities/package"
 
 import type { AuditContext } from "./audit-context"
 

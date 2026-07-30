@@ -64,6 +64,11 @@ const eslintConfig = defineConfig([
       // unclassified — and every policy below then skips them silently.
       "boundaries/elements": [
         { type: "domain", pattern: "src/domain" },
+        // Wire shapes, a peer of the layers rather than inside one. They read
+        // the domain to map from it, and nothing in the domain reads them
+        // back — a DTO exists for the outside world, so the domain owning one
+        // would be the domain knowing how it is serialised.
+        { type: "dtos", pattern: "src/dtos" },
         { type: "application", pattern: "src/application" },
         { type: "infrastructure", pattern: "src/infrastructure" },
         // `views`, not `components`. The plugin classifies a file by its
@@ -95,15 +100,21 @@ const eslintConfig = defineConfig([
               allow: { to: { element: { type: "domain" } } },
             },
             {
+              from: { element: { type: "dtos" } },
+              allow: { to: { element: { type: ["dtos", "domain"] } } },
+            },
+            {
               from: { element: { type: "application" } },
-              allow: { to: { element: { type: ["application", "domain"] } } },
+              allow: {
+                to: { element: { type: ["application", "domain", "dtos"] } },
+              },
             },
             {
               from: { element: { type: "infrastructure" } },
               allow: {
                 to: {
                   element: {
-                    type: ["infrastructure", "application", "domain"],
+                    type: ["infrastructure", "application", "domain", "dtos"],
                   },
                 },
               },
@@ -113,7 +124,13 @@ const eslintConfig = defineConfig([
               allow: {
                 to: {
                   element: {
-                    type: ["presentation", "application", "domain", "ui"],
+                    type: [
+                      "presentation",
+                      "application",
+                      "domain",
+                      "dtos",
+                      "ui",
+                    ],
                   },
                 },
               },
@@ -133,6 +150,7 @@ const eslintConfig = defineConfig([
                       "application",
                       "infrastructure",
                       "domain",
+                      "dtos",
                       "ui",
                     ],
                   },

@@ -1,8 +1,8 @@
 import {
-  customerNotFound,
   type DomainError,
   invalidPickupRequest,
   lockerAlreadyOccupied,
+  lockerLabelTaken,
   lockerNotOccupied,
   malformedInput,
   noSuitableLockerAvailable,
@@ -18,7 +18,7 @@ const everyError: DomainError[] = [
   packageAlreadyRetrieved("package-1"),
   malformedInput("amount", "must be an integer"),
   stationNotFound("station-1"),
-  customerNotFound("customer-1"),
+  lockerLabelTaken("station-1", "A1"),
 ]
 
 describe("domain errors", () => {

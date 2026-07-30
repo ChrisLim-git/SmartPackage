@@ -73,11 +73,6 @@ const RESPONSES: Record<
     code: "StationNotFound",
     message: "That station does not exist.",
   },
-  CustomerNotFound: {
-    status: 404,
-    code: "CustomerNotFound",
-    message: "That customer does not exist.",
-  },
   // A conflict, not a server fault and not a malformed request: the caller sent
   // something reasonable that the current state refuses. Replaced below with the
   // label, which the caller supplied and so already knows.
@@ -104,6 +99,44 @@ export const toHttpResponse = (error: DomainError): Response => {
 
   return errorResponse(mapped.code, message, mapped.status)
 }
+
+/**
+ * A JSON body, parsed and validated, or the 400 to answer with.
+ *
+ * The four handlers that take a body all wrote the same six lines: `json()` with
+ * a `catch` so malformed JSON is a refusal rather than a throw, `safeParse`, and
+ * the first issue as the message. Copied, the sentence a caller reads for a bad
+ * body depends on which endpoint they hit.
+ *
+ * Returns a discriminated union rather than throwing, for the same reason the
+ * domain returns `Result`: a bad body is an expected answer to an ordinary
+ * mistake, and the handler should have to say what it does about it.
+ */
+export const parseBody = async <TParsed>(
+  request: Request,
+  schema: { safeParse(value: unknown): SafeParse<TParsed> }
+): Promise<{ ok: true; data: TParsed } | { ok: false; response: Response }> => {
+  // `null` on malformed JSON, which the schema then refuses like any other
+  // wrong shape — an empty body and `{` are the same mistake to a caller.
+  const body = await request.json().catch(() => null)
+  const parsed = schema.safeParse(body)
+
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : {
+        ok: false,
+        response: errorResponse(
+          "MalformedInput",
+          parsed.error.issues[0].message,
+          400
+        ),
+      }
+}
+
+/** Zod's result shape, named here so this module does not depend on Zod. */
+type SafeParse<TParsed> =
+  | { success: true; data: TParsed }
+  | { success: false; error: { issues: { message: string }[] } }
 
 /**
  * The last resort: something threw.

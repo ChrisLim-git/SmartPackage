@@ -8,6 +8,3 @@
 export type AuditContext = {
   readonly actingUserId: string | null
 }
-
-/** For seeds and system writes: explicit about having no actor, rather than passing a bare null. */
-export const SYSTEM_ACTOR: AuditContext = { actingUserId: null }

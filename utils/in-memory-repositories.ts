@@ -218,10 +218,6 @@ export class InMemoryPackageRepository implements PackageRepository {
 
     return true
   }
-
-  async findByCustomerId(customerId: string): Promise<Package[]> {
-    return this.parcels.filter((parcel) => parcel.customerId === customerId)
-  }
 }
 
 export class InMemoryCustomerRepository implements CustomerRepository {

@@ -1,10 +1,6 @@
 import { z } from "zod"
 
-import {
-  errorResponse,
-  toHttpResponse,
-  toServerFailure,
-} from "@dtos/http-error"
+import { parseBody, toHttpResponse, toServerFailure } from "@dtos/http-error"
 import { toStoredPackageDto } from "@dtos/package"
 import { isErr } from "@domain/shared/result"
 import { guards, storePackage } from "@infrastructure/container"
@@ -43,12 +39,8 @@ export async function POST(request: Request) {
   const session = await guards.requireRole(request.headers, "agent")
   if (isErr(session)) return toResponse(session.error)
 
-  const body = await request.json().catch(() => null)
-  const command = storeSchema.safeParse(body)
-
-  if (!command.success) {
-    return errorResponse("MalformedInput", command.error.issues[0].message, 400)
-  }
+  const command = await parseBody(request, storeSchema)
+  if (!command.ok) return command.response
 
   // A `Result` is an expected outcome and maps to a status; a throw is a bug or
   // an infrastructure failure, and the flow has several — the pickup-code space

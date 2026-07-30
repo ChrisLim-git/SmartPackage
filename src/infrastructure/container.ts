@@ -5,10 +5,8 @@ import { StorePackageService } from "@domain/services/store-package-service"
 import { TieredDailyRateFeeService } from "@domain/services/tiered-daily-rate-fee-service"
 
 import { db } from "./database/client"
-import { CustomerRepository } from "./database/repositories/customer-repository"
 import { LockerRepository } from "./database/repositories/locker-repository"
 import { LockerSizeRepository } from "./database/repositories/locker-size-repository"
-import { PackageRepository } from "./database/repositories/package-repository"
 import { PricingRepository } from "./database/repositories/pricing-repository"
 import { StationRepository } from "./database/repositories/station-repository"
 import { UnitOfWork } from "./database/unit-of-work"
@@ -38,8 +36,6 @@ export const stations = new StationRepository(db)
 export const lockers = new LockerRepository(db)
 export const lockerSizes = new LockerSizeRepository(db)
 export const pricing = new PricingRepository(db)
-export const customers = new CustomerRepository(db, ids)
-export const packages = new PackageRepository(db)
 
 /**
  * The repositories above hold the pool; the ones inside a `run` hold the

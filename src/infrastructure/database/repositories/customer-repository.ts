@@ -1,5 +1,3 @@
-import { and, eq } from "drizzle-orm"
-
 import { Customer } from "@domain/entities/customer"
 import type { AuditContext } from "@domain/interfaces/audit-context"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
@@ -35,44 +33,6 @@ export class CustomerRepository extends EntityRepository<
       }),
       row.id
     )
-  }
-
-  async findByEmail(email: string): Promise<Customer | null> {
-    const [row] = await this.query
-      .select()
-      .from(customer)
-      // Folded, because the entity folds on the way in and a caller may not
-      // have gone through one.
-      .where(and(eq(customer.email, email.trim().toLowerCase()), this.visible))
-      .limit(1)
-
-    return row === undefined ? null : this.toEntity(row)
-  }
-
-  async save(entity: Customer, actor: AuditContext): Promise<Customer> {
-    const [row] = await this.query
-      .insert(customer)
-      .values({
-        id: entity.id,
-        name: entity.name,
-        email: entity.email,
-        phone: entity.phone,
-        userId: entity.userId,
-        ...this.stamp(actor),
-      })
-      .onConflictDoUpdate({
-        target: customer.id,
-        set: {
-          name: entity.name,
-          email: entity.email,
-          phone: entity.phone,
-          userId: entity.userId,
-          updatedBy: actor.actingUserId,
-        },
-      })
-      .returning()
-
-    return this.toEntity(row)
   }
 
   /**

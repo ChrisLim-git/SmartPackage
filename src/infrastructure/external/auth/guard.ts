@@ -1,3 +1,4 @@
+import { errorResponse } from "@dtos/http-error"
 import { err, isErr, ok, type Result } from "@domain/shared/result"
 
 import type { auth as appAuth, Role } from "./auth"
@@ -42,10 +43,11 @@ const STATUS: Record<AuthFailure["code"], number> = {
  * unauthorised caller about the system.
  */
 export const toResponse = (failure: AuthFailure): Response =>
-  Response.json(
-    { error: { code: failure.code, message: failure.message } },
-    { status: STATUS[failure.code] }
-  )
+  // Through `errorResponse` rather than building the envelope here. Two places
+  // that both know the wire shape are two places that can stop agreeing about
+  // it, and a client parsing `error.code` would find one endpoint that spelled
+  // it differently.
+  errorResponse(failure.code, failure.message, STATUS[failure.code])
 
 /**
  * Built as a factory for the same reason `auth` is: a test points the guards at

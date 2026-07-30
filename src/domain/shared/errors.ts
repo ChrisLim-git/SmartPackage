@@ -58,12 +58,6 @@ export type StationNotFound = {
   readonly message: string
 }
 
-export type CustomerNotFound = {
-  readonly code: "CustomerNotFound"
-  readonly customerId: string
-  readonly message: string
-}
-
 /**
  * A label is unique within a station, so this carries both — the same label at
  * another station is not a conflict, it is the normal case.
@@ -83,7 +77,6 @@ export type DomainError =
   | PackageAlreadyRetrieved
   | MalformedInput
   | StationNotFound
-  | CustomerNotFound
   | LockerLabelTaken
 
 /** Nothing free at the station fits the package. Normal, not exceptional. */
@@ -151,12 +144,6 @@ export const stationNotFound = (stationId: string): StationNotFound => ({
   code: "StationNotFound",
   stationId,
   message: `No station with id ${stationId}.`,
-})
-
-export const customerNotFound = (customerId: string): CustomerNotFound => ({
-  code: "CustomerNotFound",
-  customerId,
-  message: `No customer with id ${customerId}.`,
 })
 
 /**

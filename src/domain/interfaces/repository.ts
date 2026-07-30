@@ -104,7 +104,7 @@ export type PackageRepository = {
   /**
    * The parcel a pickup code opens.
    *
-   * The recipient types six digits and nothing else — no station, no locker
+   * The recipient types six characters and nothing else — no station, no locker
    * number — so the code has to identify the parcel on its own. Looked up by
    * hash, because the plaintext is never stored; and scoped to `stored`, so a
    * collected parcel's code stops working the moment it is used.
@@ -119,15 +119,9 @@ export type PackageRepository = {
    * a boolean says so without the domain learning what a unique index is.
    */
   save(parcel: Package, actor: AuditContext): Promise<boolean>
-
-  findByCustomerId(customerId: string): Promise<Package[]>
 }
 
 export type CustomerRepository = Repository<Customer> & {
-  findByEmail(email: string): Promise<Customer | null>
-
-  save(customer: Customer, actor: AuditContext): Promise<Customer>
-
   /**
    * A business operation, not two database calls in a trench coat.
    *

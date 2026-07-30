@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 
 import { Package } from "@domain/entities/package"
 import type { AuditContext } from "@domain/interfaces/audit-context"
@@ -96,16 +96,6 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
       .limit(1)
 
     return row === undefined ? null : this.toEntity(row)
-  }
-
-  async findByCustomerId(customerId: string): Promise<Package[]> {
-    const rows = await this.selectPackages()
-      .where(and(eq(packageTable.customerId, customerId), this.visible))
-      // Most recent first: this list is read by the recipient, and the parcel
-      // they are asking about is almost always the last one.
-      .orderBy(desc(packageTable.storedAt))
-
-    return rows.map((row) => this.toEntity(row))
   }
 
   async save(parcel: Package, actor: AuditContext): Promise<boolean> {

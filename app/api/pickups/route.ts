@@ -1,10 +1,6 @@
 import { z } from "zod"
 
-import {
-  errorResponse,
-  toHttpResponse,
-  toServerFailure,
-} from "@dtos/http-error"
+import { parseBody, toHttpResponse, toServerFailure } from "@dtos/http-error"
 import { toCollectedPackageDto } from "@dtos/package"
 import { isErr } from "@domain/shared/result"
 import { collectPackage } from "@infrastructure/container"
@@ -38,12 +34,8 @@ const pickupSchema = z.object({
  * and break collection in the least obvious way.
  */
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null)
-  const command = pickupSchema.safeParse(body)
-
-  if (!command.success) {
-    return errorResponse("MalformedInput", command.error.issues[0].message, 400)
-  }
+  const command = await parseBody(request, pickupSchema)
+  if (!command.ok) return command.response
 
   // Logged in full and answered with nothing: a thrown error here describes the
   // inside of the system, and on this route more than any other — it is the one

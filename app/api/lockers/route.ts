@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { errorResponse, toHttpResponse } from "@dtos/http-error"
+import { errorResponse, parseBody, toHttpResponse } from "@dtos/http-error"
 import { toLockerDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
@@ -53,12 +53,8 @@ export async function POST(request: Request) {
   const session = await guards.requireRole(request.headers, "admin")
   if (isErr(session)) return toResponse(session.error)
 
-  const body = await request.json().catch(() => null)
-  const details = createLockerSchema.safeParse(body)
-
-  if (!details.success) {
-    return badRequest(details.error.issues[0].message)
-  }
+  const details = await parseBody(request, createLockerSchema)
+  if (!details.ok) return details.response
 
   // Whether the size exists, whether the station exists and whether the label is
   // free are all decisions about the estate, so they belong to the domain. This

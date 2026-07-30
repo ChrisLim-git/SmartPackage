@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { errorResponse, toHttpResponse } from "@dtos/http-error"
+import { parseBody, toHttpResponse } from "@dtos/http-error"
 import { toStationDto } from "@dtos/master-data"
 import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, registerStation, stations } from "@infrastructure/container"
@@ -39,12 +39,8 @@ export async function POST(request: Request) {
   const session = await guards.requireRole(request.headers, "admin")
   if (isErr(session)) return toResponse(session.error)
 
-  const body = await request.json().catch(() => null)
-  const details = createStationSchema.safeParse(body)
-
-  if (!details.success) {
-    return errorResponse("MalformedInput", details.error.issues[0].message, 400)
-  }
+  const details = await parseBody(request, createStationSchema)
+  if (!details.ok) return details.response
 
   const registered = await registerStation.register({
     ...details.data,

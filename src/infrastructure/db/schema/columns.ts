@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { timestamp, uuid } from "drizzle-orm/pg-core"
+import { text, timestamp, uuid } from "drizzle-orm/pg-core"
 
 /**
  * The primary key every domain table uses: a UUIDv7, time-ordered so inserts
@@ -30,6 +30,16 @@ export const primaryId = () =>
  * genuinely have no acting user, and inventing a sentinel account to dodge a
  * null would be the worse design.
  *
+ * They are `text`, not `uuid`, because that is what an acting user's id is:
+ * BetterAuth issues a 32-character alphanumeric id, and a `uuid` column rejects
+ * every one of them. Only a null actor fits both types, which is why a suite
+ * that always passes `SYSTEM_ACTOR` can stay green over a column that no real
+ * signed-in write could ever use.
+ *
+ * There is deliberately no foreign key to `user`. An audit stamp is a record of
+ * what happened, and a key would force a choice between blocking a deletion and
+ * rewriting history — neither of which is what an audit column is for.
+ *
  * BetterAuth's own tables are exempt — their schema is CLI-generated and
  * editing it invites drift on every regeneration.
  */
@@ -37,12 +47,12 @@ export const auditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-  createdBy: uuid("created_by"),
+  createdBy: text("created_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     // Stamped by the ORM on every update, so no repository has to remember.
     .$onUpdate(() => new Date()),
-  updatedBy: uuid("updated_by"),
+  updatedBy: text("updated_by"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }

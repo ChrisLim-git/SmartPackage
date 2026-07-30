@@ -55,10 +55,12 @@ const config = {
     "^@application/(.*)$": "<rootDir>/src/application/$1",
     "^@infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1",
     "^@presentation/(.*)$": "<rootDir>/src/presentation/$1",
-    "\\.(css|less|sass|scss)$": "<rootDir>/test/mocks/style.cjs",
-    "\\.(png|jpg|jpeg|gif|webp|avif|ico|bmp|svg|woff2?)$":
-      "<rootDir>/test/mocks/file.cjs",
-    "^server-only$": "<rootDir>/test/mocks/empty.cjs",
+    // No stylesheet, asset or `server-only` mappings. They were carried over
+    // from what `next/jest` provides, and nothing here exercises them: there
+    // are no component tests, and no module imports `server-only`. A mapping
+    // pointing at a stub nobody reaches is configuration that reads as
+    // coverage. The first component test that renders something importing CSS
+    // adds its own line back.
     "^@/(.*)$": "<rootDir>/$1",
   },
 

@@ -1,0 +1,87 @@
+import type { Pool } from "pg"
+
+import type { Db } from "@infrastructure/database/client"
+import { customer } from "@infrastructure/database/schema/customer"
+import { locker } from "@infrastructure/database/schema/locker"
+import { lockerSize } from "@infrastructure/database/schema/locker-size"
+import { station } from "@infrastructure/database/schema/station"
+
+/**
+ * The smallest network a package can exist in: an agent, a recipient, a station,
+ * the size ladder, and one locker per size.
+ *
+ * Shared between the suites that need real rows because a `package` row cannot
+ * be inserted without all of it — five foreign keys, one of them into
+ * BetterAuth's `user`. Every id is whatever the database issued, never a
+ * literal: the columns are `uuid` with a `uuidv7()` default, and a test that
+ * hard-codes one stops noticing when that changes.
+ */
+export type Network = {
+  agentId: string
+  customerId: string
+  stationId: string
+  sizeIds: Record<string, string>
+  lockerIds: Record<string, string>
+}
+
+export const SIZES = [
+  { code: "S", rank: 1, label: "Small" },
+  { code: "M", rank: 2, label: "Medium" },
+  { code: "L", rank: 3, label: "Large" },
+]
+
+export const seedNetwork = async (pool: Pool, db: Db): Promise<Network> => {
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO "user" (name, email, email_verified, created_at, updated_at)
+     VALUES ('Ari Agent', 'agent@fixture.test', false, now(), now())
+     RETURNING id`
+  )
+  const agentId = rows[0].id
+
+  const [recipient] = await db
+    .insert(customer)
+    .values({ name: "Ada Lovelace", email: "ada@fixture.test" })
+    .returning()
+
+  const [site] = await db
+    .insert(station)
+    .values({ name: "Central Mall", address: "1 Mall Way" })
+    .returning()
+
+  const sizeRows = await db.insert(lockerSize).values(SIZES).returning()
+  const sizeIds = Object.fromEntries(
+    sizeRows.map((row) => [row.code, row.id])
+  ) as Record<string, string>
+
+  const lockerRows = await db
+    .insert(locker)
+    .values(
+      SIZES.map((size) => ({
+        stationId: site.id,
+        sizeId: sizeIds[size.code],
+        label: `${size.code}1`,
+      }))
+    )
+    .returning()
+  const lockerIds = Object.fromEntries(
+    lockerRows.map((row) => [row.label, row.id])
+  ) as Record<string, string>
+
+  return {
+    agentId,
+    customerId: recipient.id,
+    stationId: site.id,
+    sizeIds,
+    lockerIds,
+  }
+}
+
+/** In foreign-key order, so a re-run starts from nothing. */
+export const clearNetwork = async (pool: Pool): Promise<void> => {
+  await pool.query("DELETE FROM package")
+  await pool.query("DELETE FROM locker")
+  await pool.query("DELETE FROM station")
+  await pool.query("DELETE FROM locker_size")
+  await pool.query("DELETE FROM customer")
+  await pool.query(`DELETE FROM "user" WHERE email LIKE '%@fixture.test'`)
+}

@@ -74,6 +74,9 @@ export class DrizzleLockerRepository implements LockerRepository {
       .limit(1)
 
     if (size === undefined) {
+      // A bug, not caller input: the route checks the code against the size
+      // ladder before it gets here, so reaching this line means the ladder
+      // changed underneath a request or a caller skipped the route.
       throw new Error(`no locker size is coded "${details.sizeCode}"`)
     }
 

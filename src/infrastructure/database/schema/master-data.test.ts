@@ -9,9 +9,10 @@ import { station } from "./station"
 const { pool, db } = createTestDb()
 
 /**
- * Every table the domain owns. BetterAuth's four are deliberately absent: their
- * schema is CLI-generated, and holding them to a convention this repo invented
- * would mean editing a file that gets overwritten.
+ * Every table the domain owns. BetterAuth's four are deliberately absent from
+ * the audit-column and soft-delete conventions — an account is not a domain
+ * table. They are held to the key convention only, which is asserted
+ * separately, because a foreign key from `created_by` has to match.
  */
 const DOMAIN_TABLES = [
   "customer",
@@ -36,14 +37,31 @@ const columnsOf = async (table: string) => {
     column_name: string
     data_type: string
     udt_name: string
+    column_default: string | null
+    numeric_precision: number | null
+    numeric_scale: number | null
   }>(
-    `SELECT column_name, data_type, udt_name
+    `SELECT column_name, data_type, udt_name,
+            column_default, numeric_precision, numeric_scale
        FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = $1`,
     [table]
   )
 
   return rows
+}
+
+const primaryKeyOf = async (table: string) => {
+  const { rows } = await pool.query<{ attname: string }>(
+    `SELECT a.attname
+       FROM pg_index i
+       JOIN pg_attribute a
+         ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+      WHERE i.indrelid = $1::regclass AND i.indisprimary`,
+    [table]
+  )
+
+  return rows.map((row) => row.attname)
 }
 
 describe("the master data schema", () => {
@@ -56,11 +74,29 @@ describe("the master data schema", () => {
   })
 
   describe("conventions", () => {
-    it.each(DOMAIN_TABLES)("gives %s a uuid primary key", async (table) => {
+    it.each(DOMAIN_TABLES)("gives %s a uuidv7 primary key", async (table) => {
       const id = (await columnsOf(table)).find((c) => c.column_name === "id")
 
       expect(id?.data_type).toBe("uuid")
+      // A `uuid` column says nothing about which version fills it. `uuidv7()`
+      // is the half that makes the key time-sortable, so assert the default
+      // rather than the type alone.
+      expect(id?.column_default).toBe("uuidv7()")
+      expect(await primaryKeyOf(table)).toEqual(["id"])
     })
+
+    it.each(["user", "session", "account", "verification"])(
+      "gives BetterAuth's %s table a uuidv7 key too",
+      async (table) => {
+        const id = (await columnsOf(table)).find((c) => c.column_name === "id")
+
+        // BetterAuth supplies the id on every write it makes, but a seed or a
+        // migration inserting here gets the column default — and a v4 sitting
+        // beside v7s is the convention quietly broken.
+        expect(id?.data_type).toBe("uuid")
+        expect(id?.column_default).toBe("uuidv7()")
+      }
+    )
 
     it.each(DOMAIN_TABLES)("gives %s all five audit columns", async (table) => {
       const present = (await columnsOf(table)).map((c) => c.column_name)
@@ -92,13 +128,46 @@ describe("the master data schema", () => {
       expect(fee?.data_type).toBe("numeric")
     })
 
-    it("times everything with a time zone", async () => {
-      const storedAt = (await columnsOf("package")).find(
-        (c) => c.column_name === "stored_at"
-      )
+    it.each(DOMAIN_TABLES)(
+      "gives every numeric column on %s the same precision and scale",
+      async (table) => {
+        // A bare `numeric` is unconstrained, and two money columns of
+        // different scale round differently. The convention is one width
+        // everywhere, so assert the width — not merely the type.
+        const money = (await columnsOf(table)).filter(
+          (c) => c.data_type === "numeric"
+        )
 
-      expect(storedAt?.data_type).toBe("timestamp with time zone")
-    })
+        for (const column of money) {
+          expect({
+            column: column.column_name,
+            precision: column.numeric_precision,
+            scale: column.numeric_scale,
+          }).toEqual({
+            column: column.column_name,
+            precision: 12,
+            scale: 2,
+          })
+        }
+      }
+    )
+
+    it.each(DOMAIN_TABLES)(
+      "times every timestamp on %s with a time zone",
+      async (table) => {
+        const times = (await columnsOf(table)).filter((c) =>
+          c.data_type.startsWith("timestamp")
+        )
+
+        // Includes the three audit timestamps on every table, not just the
+        // domain's own `stored_at` / `retrieved_at`. A naive timestamp anywhere
+        // makes "how many days has this been stored" depend on server locale.
+        expect(times.length).toBeGreaterThan(0)
+        expect(
+          times.filter((c) => c.data_type !== "timestamp with time zone")
+        ).toEqual([])
+      }
+    )
 
     it("makes both status columns real enums, not free text", async () => {
       const lockerStatusColumn = (await columnsOf("locker")).find(

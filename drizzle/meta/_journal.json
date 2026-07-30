@@ -36,6 +36,13 @@
       "when": 1785392210408,
       "tag": "0004_nosy_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785399400813,
+      "tag": "0005_sweet_stardust",
+      "breakpoints": true
     }
   ]
 }

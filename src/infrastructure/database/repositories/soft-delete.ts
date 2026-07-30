@@ -7,7 +7,7 @@ type SoftDeletable = { deletedAt: PgColumn }
 /**
  * The read filter every repository applies: a soft-deleted row is gone.
  *
- * It lives here rather than in each query so that no use case ever writes
+ * It lives here rather than in each query so that no caller ever writes
  * `deleted_at IS NULL` — the day one is forgotten, deleted rows quietly come
  * back, and nothing fails to make that visible.
  *

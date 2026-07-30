@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 /** The same shape the route validates. Both sides reject the same thing. */
 const schema = z.object({
@@ -95,19 +102,18 @@ export const CreateLockerDialog = ({
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="stationId">Station</FieldLabel>
-                  <select
-                    id="stationId"
-                    className="h-9 rounded-md border bg-background px-3 text-sm"
-                    value={field.value}
-                    onChange={field.onChange}
-                  >
-                    <option value="">Choose a station</option>
-                    {stations.map((station) => (
-                      <option key={station.id} value={station.id}>
-                        {station.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="stationId" className="w-full">
+                      <SelectValue placeholder="Choose a station" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stations.map((station) => (
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.stationId && (
                     <FieldError>{errors.stationId.message}</FieldError>
                   )}
@@ -121,19 +127,18 @@ export const CreateLockerDialog = ({
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="sizeCode">Size</FieldLabel>
-                  <select
-                    id="sizeCode"
-                    className="h-9 rounded-md border bg-background px-3 text-sm"
-                    value={field.value}
-                    onChange={field.onChange}
-                  >
-                    <option value="">Choose a size</option>
-                    {sizes.map((size) => (
-                      <option key={size.code} value={size.code}>
-                        {size.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="sizeCode" className="w-full">
+                      <SelectValue placeholder="Choose a size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sizes.map((size) => (
+                        <SelectItem key={size.code} value={size.code}>
+                          {size.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.sizeCode && (
                     <FieldError>{errors.sizeCode.message}</FieldError>
                   )}

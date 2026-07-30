@@ -1,8 +1,8 @@
 /**
  * `Result` is how every layer reports an expected failure. Throwing is
  * reserved for bugs and infrastructure faults: "no locker fits this package"
- * and "that pickup code is wrong" are ordinary outcomes, and a use case that
- * returns them is a use case whose failure paths can be asserted without
+ * and "that pickup code is wrong" are ordinary outcomes, and a service that
+ * returns them is a service whose failure paths can be asserted without
  * `expect().toThrow()`.
  *
  * Deliberately four operations and no more. This is a return shape, not a

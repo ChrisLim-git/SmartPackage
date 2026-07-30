@@ -12,8 +12,9 @@ export type StationAttributes = {
  *
  * Deliberately thin — a station has no behaviour, because every rule that could
  * live here is really about the lockers inside it. It exists as an entity
- * rather than a row shape so a repository has something to return that the
- * application layer can hold without knowing what a database is.
+ * rather than a row shape so a repository has something to return that a
+ * domain service or a route handler can hold without knowing what a database
+ * is.
  */
 export class Station {
   private constructor(

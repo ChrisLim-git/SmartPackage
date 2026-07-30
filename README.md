@@ -130,10 +130,10 @@ Every source of non-determinism is an interface, which is why the domain tests n
 | `PickupCodeGenerator`                                               | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
 | `PickupCodeHasher`                                                  | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitService` / `LockerSelectionService` / `StorageFeeService` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
-| `*Repository`, `UnitOfWork`                                         | domain      | Drizzle                                         | in-memory fakes                           |
-| `Notifier`                                                          | domain      | `LoggingNotifier`                               | `RecordingNotifier`                       |
+| `*Repository`                                                       | domain      | Drizzle                                         | in-memory fakes                           |
+| `UnitOfWork`                                                        | domain      | `DrizzleUnitOfWork` — _arrives with T402_       | `InMemoryUnitOfWork`                      |
 
-`Notifier` exists to make a boundary that is out of scope _visible_ rather than absent.
+There is no `Notifier`. Notification is out of scope, and an interface with a logging implementation and no caller would be an abstraction added for a need the spec does not have.
 
 ### The invariant everything serves
 
@@ -155,7 +155,7 @@ The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" 
 - **Pickup codes are stored hashed** and compared by hash, in constant time. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker. The hash is HMAC-SHA256 under a server-side pepper (`PICKUP_CODE_PEPPER`) rather than a bare digest — six digits is a million candidates, which a bare digest column gives up in seconds.
 - **UUIDv7 primary keys**, generated through `IdGenerator` so entities are valid before they reach a repository, with `DEFAULT uuidv7()` as a safety net. Postgres 18 provides `uuidv7()` natively — no extension.
 - **Five audit columns on every domain table**: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`. Deliberately no `deleted_by` — a soft delete is a write, so `updated_by` already records the actor. Reads filter `deleted_at IS NULL` in the shared `notDeleted` helper, so no caller ever writes that filter.
-- Better Auth owns `user`, `session`, `account`, `verification`; its schema is CLI-generated and editing it invites drift on every regeneration.
+- Better Auth owns `user`, `session`, `account`, `verification`. Its schema is CLI-generated, and the two edits it carries are recorded in a header comment on the file so a regeneration re-applies them: `uuid` id columns with a `uuidv7()` default, so `created_by` can be a foreign key to `user.id` and so a seed insert gets the same kind of key as everything else. No audit columns and no soft delete — an account is not a domain table.
 - `snake_case` columns, **singular** table names (`locker`, not `lockers`), `timestamptz` never bare `timestamp`.
 
 ### Patterns used, and refused
@@ -173,7 +173,8 @@ src/domain/**/*.test.ts          no deps, fake Clock/Id/Code — including the s
                                  and retrieve flows, against in-memory repositories
 src/dtos/**/*.test.ts            wire-shape mapping
 src/infrastructure/**/*.test.ts  real Postgres, cleaned between
-  …/concurrency.test.ts          real pool, parallel claims — the contention proof
+  …/concurrency.test.ts          real pool, parallel claims — the contention
+                                 proof. Arrives with T502.
 app/api/**/*.test.ts             status codes, validation, wire shape, guard wiring.
                                  Never business behaviour — the domain owns that.
 components/**/*.test.tsx         jsdom
@@ -189,7 +190,7 @@ The concurrency test is **watched failing against a naive implementation before 
 
 ## Interface
 
-Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin/*` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
+Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
 
 Route handlers are the HTTP adapter only: guard, validate, delegate to a domain service, map errors to status codes. No SQL and no business rules in `route.ts`. Reads go through route handlers rather than Server Actions, which are queued and would serialise a parallel fan-out.
 

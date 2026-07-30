@@ -12,8 +12,12 @@ export default async function AdminPage() {
   const gate = await requireRole(await headers(), "admin")
 
   // A page redirects where a route handler would answer 401/403 — the same
-  // guard, a different edge.
-  if (isErr(gate)) redirect("/sign-in")
+  // guard, a different edge. The two codes cannot share a destination:
+  // "who are you" is answered by signing in, but sending a signed-in agent to
+  // the sign-in form answers a question they have already answered.
+  if (isErr(gate)) {
+    redirect(gate.error.code === "Unauthenticated" ? "/sign-in" : "/")
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
@@ -24,9 +28,10 @@ export default async function AdminPage() {
         </p>
       </header>
 
-      {/* The role is resolved on the server and passed down, so the client
-          never decides for itself whether it is an admin. */}
-      <LockerAdmin isAdmin={gate.value.user.role === "admin"} />
+      {/* No `isAdmin` prop: the guard above already refused everyone else, so
+          a flag computed here could only ever be true. The two layers that
+          matter are this guard and the one on `POST /api/lockers`. */}
+      <LockerAdmin />
     </main>
   )
 }

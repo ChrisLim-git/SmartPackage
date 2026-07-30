@@ -1,6 +1,7 @@
 import type { AuditContext } from "@domain/interfaces/audit-context"
 import type { CustomerRepository } from "@domain/interfaces/customer-repository"
 import type { LockerRepository } from "@domain/interfaces/locker-repository"
+import type { LockerSizeRepository } from "@domain/interfaces/locker-size-repository"
 import type { PackageRepository } from "@domain/interfaces/package-repository"
 import type { PricingRepository } from "@domain/interfaces/pricing-repository"
 import type { StationRepository } from "@domain/interfaces/station-repository"
@@ -20,13 +21,17 @@ import type { PricingConfig } from "@domain/utils/pricing-config"
 import type { LockerSize, PackageSize } from "@domain/utils/size"
 
 /**
- * In-memory repositories, for use-case tests that have no business touching a
- * database.
+ * In-memory repositories, for domain-service tests that have no business
+ * touching a database.
  *
- * These are not mocks. Each holds real state and answers real queries, so a use
- * case exercised against one is exercised properly — it just runs in
+ * These are not mocks. Each holds real state and answers real queries, so a
+ * service exercised against one is exercised properly — it just runs in
  * microseconds. What they cannot prove is anything about SQL, which is why the
  * Drizzle implementations are tested separately against real Postgres.
+ *
+ * They have no importer until T401. That is deliberate: the fakes and the
+ * repository interfaces were written together in T303, so the contract had a
+ * second implementation to answer to before the first one shipped.
  */
 
 export class InMemoryStationRepository implements StationRepository {
@@ -249,7 +254,7 @@ export class InMemoryPricingRepository implements PricingRepository {
  * Runs the work and hands back what it returns.
  *
  * There is no rollback here, and pretending otherwise would be worse than not
- * having one: a fake that silently undid writes would let a use case depend on
+ * having one: a fake that silently undid writes would let a service depend on
  * atomicity this cannot provide, and the first real failure would happen in
  * Postgres. Whether the transaction actually holds is proven against the
  * database, not here.
@@ -264,5 +269,12 @@ export class InMemoryUnitOfWork implements UnitOfWork {
   }
 }
 
-/** Present so the signature matches; the fakes have nothing to stamp. */
-export const NO_ACTOR: AuditContext = { actingUserId: null }
+export class InMemoryLockerSizeRepository implements LockerSizeRepository {
+  constructor(private readonly sizes: readonly LockerSize[]) {}
+
+  async findAll(): Promise<LockerSize[]> {
+    // Rank order, because the selection rule reads the ladder in order and a
+    // fake that returned insertion order would let a bug in that ordering pass.
+    return [...this.sizes].sort((a, b) => a.rank - b.rank)
+  }
+}

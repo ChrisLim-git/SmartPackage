@@ -3,7 +3,7 @@ import { z } from "zod"
 import { toLockerDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
-import { guards, lockers } from "@infrastructure/container"
+import { guards, lockerSizes, lockers } from "@infrastructure/container"
 
 /**
  * A station id reaches this handler as text from a query string, and every
@@ -57,6 +57,21 @@ export async function POST(request: Request) {
 
   if (!details.success) {
     return badRequest(details.error.issues[0].message)
+  }
+
+  // A size code is caller input exactly as a station id is, and the repository
+  // can only answer "no such size" by throwing. Left unchecked that is a 500
+  // for a typo, and it would make the repository's throw mean something other
+  // than what the README says a throw means: a bug or an infrastructure
+  // failure. Checked here, both stay true.
+  const known = await lockerSizes.findAll()
+
+  if (!known.some((size) => size.code === details.data.sizeCode)) {
+    return badRequest(
+      `"${details.data.sizeCode}" is not a locker size. Known sizes: ${known
+        .map((size) => size.code)
+        .join(", ")}.`
+    )
   }
 
   const created = await lockers.create(details.data, {

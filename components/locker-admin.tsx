@@ -8,6 +8,13 @@ import type { LockerDto, LockerSizeDto, StationDto } from "@dtos/master-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -18,6 +25,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { CreateLockerDialog } from "./create-locker-dialog"
+
+/**
+ * Radix reserves the empty string on a `SelectItem` for "clear the selection",
+ * so "no filter" needs a name of its own rather than `""`.
+ */
+const ALL_STATIONS = "all"
 
 const fetchJson = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url)
@@ -74,9 +87,9 @@ const LoadingRows = ({ columns }: { columns: number }) => (
   </>
 )
 
-export const LockerAdmin = ({ isAdmin }: { isAdmin: boolean }) => {
+export const LockerAdmin = () => {
   const queries = useQueryClient()
-  const [stationFilter, setStationFilter] = useState<string>("")
+  const [stationFilter, setStationFilter] = useState<string>(ALL_STATIONS)
 
   const stations = useQuery({
     queryKey: ["stations"],
@@ -125,7 +138,8 @@ export const LockerAdmin = ({ isAdmin }: { isAdmin: boolean }) => {
       : []
 
   const visible = (lockers.data ?? []).filter(
-    (locker) => stationFilter === "" || locker.stationId === stationFilter
+    (locker) =>
+      stationFilter === ALL_STATIONS || locker.stationId === stationFilter
   )
   const stationName = (id: string) =>
     stations.data?.find((station) => station.id === id)?.name ?? "—"
@@ -200,28 +214,27 @@ export const LockerAdmin = ({ isAdmin }: { isAdmin: boolean }) => {
             <label className="sr-only" htmlFor="station-filter">
               Filter by station
             </label>
-            <select
-              id="station-filter"
-              className="h-9 rounded-md border bg-background px-3 text-sm"
-              value={stationFilter}
-              onChange={(event) => setStationFilter(event.target.value)}
-            >
-              <option value="">All stations</option>
-              {(stations.data ?? []).map((station) => (
-                <option key={station.id} value={station.id}>
-                  {station.name}
-                </option>
-              ))}
-            </select>
-            {/* Hidden from a non-admin as a courtesy; the API refuses them
-                regardless, which is the part that is security. */}
-            {isAdmin && (
-              <CreateLockerDialog
-                stations={stations.data ?? []}
-                sizes={sizes.data ?? []}
-                onCreate={(details) => created.mutateAsync(details)}
-              />
-            )}
+            <Select value={stationFilter} onValueChange={setStationFilter}>
+              <SelectTrigger id="station-filter" className="w-44">
+                <SelectValue placeholder="All stations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_STATIONS}>All stations</SelectItem>
+                {(stations.data ?? []).map((station) => (
+                  <SelectItem key={station.id} value={station.id}>
+                    {station.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Reachable only from `/admin`, which is guarded on the server;
+                the API refuses a non-admin regardless, and that is the part
+                that is security. */}
+            <CreateLockerDialog
+              stations={stations.data ?? []}
+              sizes={sizes.data ?? []}
+              onCreate={(details) => created.mutateAsync(details)}
+            />
           </div>
         </div>
 

@@ -71,7 +71,7 @@ const eslintConfig = defineConfig([
         { type: "dtos", pattern: "src/dtos" },
         { type: "infrastructure", pattern: "src/infrastructure" },
         // app/ is the composition root: it wires concrete implementations into
-        // use cases, so it is the one place allowed to see everything.
+        // domain services, so it is the one place allowed to see everything.
         { type: "app", pattern: "app" },
         // `components/ui` must come before `components`. The plugin classifies
         // a file by its *nearest* matching ancestor folder, so a shadcn

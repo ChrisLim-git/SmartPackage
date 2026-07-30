@@ -172,6 +172,24 @@ describe("/api/lockers", () => {
       expect(response.status).toBe(400)
     })
 
+    it("answers 400, not 500, for a size code that is not on the ladder", async () => {
+      signedInAs("admin")
+
+      // The repository can only answer "no such size" by throwing. Unchecked
+      // here that is the server reporting a fault for a caller's typo — the
+      // same reasoning as the `stationId` case above.
+      const response = await POST(
+        request("http://test/api/lockers", {
+          stationId,
+          sizeCode: "XL",
+          label: "D1",
+        })
+      )
+
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ error: "BadRequest" })
+    })
+
     it("stamps the acting admin on the row it created", async () => {
       signedInAs("admin")
 

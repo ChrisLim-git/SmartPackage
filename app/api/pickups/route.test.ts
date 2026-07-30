@@ -108,7 +108,6 @@ describe("POST /api/pickups", () => {
       lockerLabel,
       packageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       retrievedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-      unlockUri: expect.stringContaining("smartpackage://unlock"),
     })
   })
 

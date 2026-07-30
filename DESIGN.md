@@ -125,9 +125,9 @@ Every interactive component ships **default, hover, focus, active, disabled, loa
 - Every animation has a `prefers-reduced-motion: reduce` alternative — crossfade or instant.
 - One place motion earns real weight: the agent's **store → success** transition. The locker label and code arriving needs to feel like a result, not a re-render.
 
-### The one hand-authored colour
+### No hand-authored colours
 
-`bg-white` on the QR container in `collect-package-form.tsx`. A scanner reads dark modules on a light field, and a QR rendered on a dark surface fails on plenty of supermarket hardware — so this one panel stays light in both themes. It is a functional constraint of the scanner, not a colour choice, which is why it is written down here rather than tokenised.
+Every colour comes from a token. The one exception used to be `bg-white` behind a QR code on the collect screen — a scanner needs dark modules on a light field regardless of theme. The QR is gone (it encoded a kiosk-unlock URI for hardware that is out of scope), and the exception went with it.
 
 ## Bans, enforced at review
 

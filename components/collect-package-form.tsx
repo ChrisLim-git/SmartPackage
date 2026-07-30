@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp"
 import { RiLockUnlockLine } from "@remixicon/react"
-import { QRCodeSVG } from "qrcode.react"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
@@ -82,19 +81,8 @@ export const CollectPackageForm = () => {
             Locker {collected.lockerLabel}
           </h2>
           <p className="text-muted-foreground">
-            Scan this at the kiosk and the door opens.
+            The door is unlocked. Take the package from this locker.
           </p>
-        </div>
-
-        {/* A light field regardless of theme: a scanner reads dark modules on a
-            light background, and an inverted code fails on plenty of hardware. */}
-        <div className="flex justify-center border border-border bg-white p-4">
-          <QRCodeSVG
-            value={collected.unlockUri}
-            size={200}
-            marginSize={0}
-            title={`Unlock locker ${collected.lockerLabel}`}
-          />
         </div>
 
         <div className="flex flex-col gap-1 border-t border-border pt-4">
@@ -120,8 +108,19 @@ export const CollectPackageForm = () => {
         </div>
 
         <p className="text-[0.8125rem] text-muted-foreground">
-          Take the package and close the door. The locker is free for the next
+          Close the door when you are done. The locker is free for the next
           delivery straight away, and this code will not work again.
+        </p>
+
+        {/* A declared gap rather than a silent one. The code is the only
+            credential a collection presents, and confirming it on the recipient's
+            email would be the second factor — but the notification channel is out
+            of scope across the whole spec, so saying "check your email" here would
+            promise a message nothing sends. Stated plainly instead. */}
+        <p className="border-t border-border pt-4 text-[0.8125rem] text-muted-foreground">
+          This collection is confirmed here on screen. A production build would
+          also email a verification link to the recipient — outside the scope of
+          this build.
         </p>
       </section>
     )

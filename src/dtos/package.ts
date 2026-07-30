@@ -29,16 +29,6 @@ export type CollectedPackageDto = {
   dailyRate: string
   firstTierEndsOnDay: number | null
   retrievedAt: string
-  /**
-   * What the kiosk scanner reads to open the door.
-   *
-   * The collection is already recorded by the time this exists — the parcel is
-   * marked collected and the locker released in one transaction — so this is the
-   * handoff to hardware, not a second authorisation. Physically opening a door is
-   * out of scope for this system; encoding the locker and the parcel is where its
-   * responsibility ends.
-   */
-  unlockUri: string
 }
 
 export const toStoredPackageDto = (
@@ -59,7 +49,4 @@ export const toCollectedPackageDto = (
   dailyRate: collected.baseRate.toDecimalString(),
   firstTierEndsOnDay: collected.firstTierEndsOnDay,
   retrievedAt: collected.retrievedAt.toISOString(),
-  unlockUri: `smartpackage://unlock?locker=${encodeURIComponent(
-    collected.lockerLabel
-  )}&package=${collected.packageId}`,
 })

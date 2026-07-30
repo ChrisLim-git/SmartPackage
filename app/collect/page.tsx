@@ -19,7 +19,7 @@ export default function CollectPackagePage() {
       <div className="flex flex-col gap-2">
         <h1 className="font-heading text-2xl">Collect your package</h1>
         <p className="text-muted-foreground">
-          Enter the six-digit code you were sent.
+          Enter the six-character code you were sent.
         </p>
       </div>
 

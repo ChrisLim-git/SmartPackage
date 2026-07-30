@@ -21,11 +21,11 @@ const STORED_HASH_PATTERN = /^[0-9a-f]{64}$/
 /**
  * Hashes pickup codes for storage with HMAC-SHA256 under a server-side pepper.
  *
- * The pepper is doing real work. A pickup code is six digits — a million
- * candidates — so a bare SHA-256 column is reversed by exhaustive search in
- * about a second on a laptop, and a database read would become a master key to
- * every occupied locker. With the pepper held outside the database, the same
- * read yields nothing without also compromising the application host.
+ * The pepper is doing real work. A pickup code is six characters over a
+ * 30-symbol alphabet — 729 million candidates — which is minutes of GPU time
+ * against a bare SHA-256 column, so a database read alone would become a master
+ * key to every occupied locker. With the pepper held outside the database, the
+ * same read yields nothing without also compromising the application host.
  *
  * Not bcrypt or argon2: this is verified on the collection path where a person
  * is standing at a locker, and the deliberate slowness that protects a
@@ -36,7 +36,7 @@ export class HmacPickupCodeHasher implements PickupCodeHasher {
   constructor(private readonly pepper: string = PICKUP_CODE_PEPPER) {
     if (pepper.trim().length === 0) {
       // An empty pepper hashes every code under no key at all, and the column
-      // becomes a plain digest of six digits — reversible in about a second.
+      // becomes a plain digest of a small alphabet — a wordlist, not a hash.
       throw new Error("HmacPickupCodeHasher needs a pepper")
     }
   }

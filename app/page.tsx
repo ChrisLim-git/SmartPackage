@@ -19,7 +19,7 @@ export default function Page() {
         </h1>
         <p className="text-muted-foreground">
           Parcels dropped into a locker by a delivery agent, collected with a
-          six-digit code. No account needed to collect.
+          six-character code. No account needed to collect.
         </p>
       </div>
 

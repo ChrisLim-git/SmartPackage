@@ -115,7 +115,7 @@ describe("POST /api/pickups", () => {
   it("answers a code no parcel is waiting under with 404", async () => {
     await storeOne()
 
-    expect((await POST(request({ pickupCode: "999999" }))).status).toBe(404)
+    expect((await POST(request({ pickupCode: "ZZZ999" }))).status).toBe(404)
   })
 
   it("answers a replayed code exactly as it answers an unknown one", async () => {
@@ -123,19 +123,41 @@ describe("POST /api/pickups", () => {
     await POST(request({ pickupCode }))
 
     const replayed = await read(await POST(request({ pickupCode })))
-    const unknown = await read(await POST(request({ pickupCode: "999999" })))
+    const unknown = await read(await POST(request({ pickupCode: "ZZZ999" })))
 
     // Byte-identical. A distinguishable "already collected" lets someone dialling
     // codes learn which ones were real, and confirm one after the parcel is gone.
     expect(replayed).toEqual(unknown)
   })
 
-  it("answers 400 for a code that is not six digits", async () => {
-    const response = await POST(request({ pickupCode: "abc" }))
+  it("gives nothing away when the flow throws", async () => {
+    const { pickupCode } = await storeOne()
+    // A real throw on a real path rather than a mocked one: with no pricing rows
+    // the repository refuses to guess a price, which is the class of failure a
+    // customer must never see the inside of.
+    await pool.query("DELETE FROM fee_tier")
+    await pool.query("DELETE FROM pricing_config")
 
-    // Malformed, not invalid: the shape is wrong, the caller can fix it, and
-    // saying so reveals nothing about which codes are live.
+    const response = await POST(request({ pickupCode }))
+    const payload = await response.text()
+
+    expect(response.status).toBe(500)
+    expect(payload).toContain("ServerError")
+    // No message, no query, no table name — and no hint about whether the code
+    // was even real.
+    expect(payload).not.toContain("pricing")
+    expect(payload).not.toContain("db:seed")
+    expect(payload).not.toContain(pickupCode)
+  })
+
+  it("answers 400 for a code the alphabet cannot contain", async () => {
+    // `O` and `0` are both left out of the alphabet, so this is the shape being
+    // wrong rather than the code being unknown.
+    const response = await POST(request({ pickupCode: "K4M9P0" }))
+
+    // Malformed, not invalid: the caller can fix it, and saying so reveals
+    // nothing about which codes are live.
     expect(response.status).toBe(400)
-    expect((await response.json()).error.message).toMatch(/six digits/)
+    expect((await response.json()).error.message).toMatch(/6 characters/)
   })
 })

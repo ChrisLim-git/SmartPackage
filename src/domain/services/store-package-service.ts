@@ -124,12 +124,15 @@ export class StorePackageService {
           command.audit
         )
 
-        // A code is the entire credential — the recipient types six digits and
+        // A code is the entire credential — the recipient types six characters and
         // nothing else — so no two parcels awaiting collection may share one. The
         // database refuses the duplicate; this loop is what turns that refusal
-        // into another code rather than a failed delivery. A million codes and a
-        // handful of occupied lockers make a second attempt vanishingly rare and
-        // a third rarer still.
+        // into another code rather than a failed delivery.
+        //
+        // With 729 million codes over the domain's alphabet, a first collision
+        // needs tens of thousands of parcels in lockers at once, and a second in
+        // the same store is arithmetic nobody will see. The loop stays because the
+        // index is the thing that decides, not the odds.
         for (let attempt = 1; attempt <= CODE_ATTEMPTS; attempt += 1) {
           const code = codes.generate()
 
@@ -162,7 +165,7 @@ export class StorePackageService {
           }
         }
 
-        // Every attempt collided. With a million codes that means either the
+        // Every attempt collided. Against 729 million codes that means either the
         // generator has stopped being random or the network is holding most of
         // the code space — both are faults, and neither is something the agent
         // can act on.

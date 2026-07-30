@@ -6,7 +6,7 @@ import { isErr, isOk } from "@domain/shared/result"
 import { PickupCode } from "@domain/utils/pickup-code"
 import { LockerSize } from "@domain/utils/size"
 
-import { FixedClock } from "@/utils/clocks"
+import { FixedClock } from "@/utils/fake-clocks"
 import { FakePickupCodeHasher } from "@/utils/fake-pickup-code-hasher"
 import {
   InMemoryCustomerRepository,
@@ -16,7 +16,7 @@ import {
   InMemoryStationRepository,
   InMemoryUnitOfWork,
 } from "@/utils/in-memory-repositories"
-import { SequentialIdGenerator } from "@/utils/sequential-id-generator"
+import { SequentialIdGenerator } from "@/utils/stub-sequential-id-generator"
 import { StubPickupCodeGenerator } from "@/utils/stub-pickup-code-generator"
 import { unwrap } from "@/utils/unwrap"
 
@@ -84,7 +84,7 @@ const setup = (options: { lockers?: Locker[]; codes?: string[] } = {}) => {
   const service = new StorePackageService({
     stations: new InMemoryStationRepository([station]),
     lockerSizes: new InMemoryLockerSizeRepository(sizes),
-    codes: new StubPickupCodeGenerator(options.codes ?? ["402913", "581274"]),
+    codes: new StubPickupCodeGenerator(options.codes ?? ["K4M9PT", "R7WX2D"]),
     hasher,
     ids: new SequentialIdGenerator("package"),
     clock: new FixedClock(STORED_AT),
@@ -120,7 +120,7 @@ describe("storing a package", () => {
     if (!isOk(result)) return
 
     expect(result.value.lockerLabel).toBe("S1")
-    expect(result.value.pickupCode).toBe("402913")
+    expect(result.value.pickupCode).toBe("K4M9PT")
     // From the injected clock. Ambient time would make a seven-day stay a
     // seven-day test.
     expect(result.value.storedAt).toEqual(STORED_AT)
@@ -199,7 +199,7 @@ describe("storing a package", () => {
   it("gives two consecutive stores different lockers and different codes", async () => {
     const { service } = setup({
       lockers: [free(small, "S1"), free(small, "S2")],
-      codes: ["402913", "581274"],
+      codes: ["K4M9PT", "R7WX2D"],
     })
 
     const first = await service.execute(command())
@@ -217,7 +217,7 @@ describe("storing a package", () => {
       lockers: [free(small, "S1"), free(small, "S2")],
       // The generator hands out the same code twice before moving on, which is
       // what a collision looks like from in here.
-      codes: ["402913", "402913", "581274"],
+      codes: ["K4M9PT", "K4M9PT", "R7WX2D"],
     })
 
     const first = await service.execute(command())
@@ -226,8 +226,8 @@ describe("storing a package", () => {
     // A code is the entire credential on the collect screen, so two parcels
     // awaiting collection cannot share one — the second store retries rather
     // than failing the delivery or, worse, issuing a code that opens two doors.
-    expect(isOk(first) && first.value.pickupCode).toBe("402913")
-    expect(isOk(second) && second.value.pickupCode).toBe("581274")
+    expect(isOk(first) && first.value.pickupCode).toBe("K4M9PT")
+    expect(isOk(second) && second.value.pickupCode).toBe("R7WX2D")
   })
 
   it("refuses the store when nothing free fits, mutating nothing", async () => {

@@ -30,17 +30,33 @@ const FRAMEWORK_PACKAGES = [
  * generate its own ids and stop being testable.
  */
 /**
- * `utils/` holds the test doubles: in-memory repositories, a stub code
- * generator, a pool onto `smartpackage_test`. Reached from production code, any
- * of them is a route serving fabricated data or the application writing to the
- * test database — and both would pass the suite and fail in front of a person.
+ * `utils/` holds both halves — the real adapters the container wires (the clock,
+ * the id and code generators, the hasher) and the doubles that stand in for them
+ * in a test. Only the second half is off limits to production code: a route
+ * serving fabricated data, or the application writing to `smartpackage_test`,
+ * would pass the suite and fail in front of a person.
+ *
+ * The two are told apart by name, which is why the naming is a rule rather than a
+ * habit: **every double is `fake-*`, `stub-*`, `in-memory-*`, `test-*` or
+ * `*-fixture`.** A double named otherwise is invisible to this guard.
  *
  * Restated in every block that sets `no-restricted-imports`, because flat config
- * *replaces* a rule rather than merging it: the domain's own package ban
- * silently dropped this guard until a deliberate probe found the hole.
+ * *replaces* a rule rather than merging it: the domain's own package ban silently
+ * dropped this guard until a deliberate probe found the hole.
  */
 const TEST_DOUBLE_IMPORTS = {
-  group: ["@/utils/*", "**/utils/in-memory-*", "**/utils/test-db"],
+  group: [
+    "@/utils/fake-*",
+    "@/utils/stub-*",
+    "@/utils/in-memory-*",
+    "@/utils/test-*",
+    "@/utils/*-fixture",
+    "**/utils/fake-*",
+    "**/utils/stub-*",
+    "**/utils/in-memory-*",
+    "**/utils/test-*",
+    "**/utils/*-fixture",
+  ],
   message:
     "test doubles are for tests only — production code takes the real implementation from the container.",
 }

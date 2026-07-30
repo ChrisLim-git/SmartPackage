@@ -12,10 +12,10 @@ import { StationRepository } from "./database/repositories/station-repository"
 import { UnitOfWork } from "./database/unit-of-work"
 import { auth } from "./external/auth/auth"
 import { createGuards } from "./external/auth/guard"
-import { RandomPickupCodeGenerator } from "./generators/random-pickup-code-generator"
-import { UuidV7Generator } from "./generators/uuid-v7-generator"
-import { HmacPickupCodeHasher } from "./security/pickup-code-hasher"
-import { SystemClock } from "./time/system-clock"
+import { RandomPickupCodeGenerator } from "@/utils/random-pickup-code-generator"
+import { SystemClock } from "@/utils/system-clock"
+import { HmacPickupCodeHasher } from "@/utils/pickup-code-hasher"
+import { UuidV7Generator } from "@/utils/uuid-v7-generator"
 
 /**
  * Where the interfaces meet their implementations, and the only place that knows

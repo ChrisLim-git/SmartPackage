@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp"
 import { RiLockUnlockLine } from "@remixicon/react"
 import { QRCodeSVG } from "qrcode.react"
 import { useState } from "react"
@@ -8,6 +9,10 @@ import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
 
 import type { CollectedPackageDto } from "@dtos/package"
+import {
+  PICKUP_CODE_ALPHABET,
+  PICKUP_CODE_LENGTH,
+} from "@domain/utils/pickup-code"
 
 import { FIELD_SUBMIT } from "@/components/field-surface"
 import { FormAlert } from "@/components/form-alert"
@@ -20,8 +25,23 @@ import {
 } from "@/components/ui/input-otp"
 import { useCollectPackage } from "@/hooks/use-collect-package"
 
+/**
+ * The same alphabet the domain validates against, read from the domain rather
+ * than restated — a second copy of "which characters count" is a copy that drifts,
+ * and the drift shows up as a code the customer typed correctly being refused.
+ */
 const schema = z.object({
-  pickupCode: z.string().regex(/^\d{6}$/, "Enter all six digits"),
+  pickupCode: z
+    .string()
+    .transform((value) => value.trim().toUpperCase())
+    .refine(
+      (value) =>
+        value.length === PICKUP_CODE_LENGTH &&
+        Array.from(value).every((character) =>
+          PICKUP_CODE_ALPHABET.includes(character)
+        ),
+      `Enter all ${PICKUP_CODE_LENGTH} characters from your code`
+    ),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -124,7 +144,7 @@ export const CollectPackageForm = () => {
         // the code, because that is exactly what an attacker is asking.
         <FormAlert
           message={collect.error.message}
-          advice="Check the six digits and try again."
+          advice="Check the code and try again."
         />
       )}
 
@@ -134,21 +154,36 @@ export const CollectPackageForm = () => {
           control={control}
           name="pickupCode"
           render={({ field }) => (
-            // Six cells rather than one text input: `inputMode="numeric"` raises
-            // a keypad instead of a keyboard, and `one-time-code` lets a phone
-            // offer the code straight out of the message it arrived in.
+            // Six cells rather than one text input, so the code is transcribed a
+            // character at a time and a miscount is visible. `one-time-code` lets
+            // a phone offer the code straight out of the message it arrived in.
+            //
+            // `inputMode="text"` and not `numeric`: the alphabet has letters in
+            // it, and a numeric keypad would leave a customer unable to type
+            // their own code. `pattern` keeps the field from accepting characters
+            // the alphabet excludes at all, rather than accepting and then
+            // rejecting them.
             <InputOTP
-              maxLength={6}
-              inputMode="numeric"
+              maxLength={PICKUP_CODE_LENGTH}
+              inputMode="text"
+              pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
               autoComplete="one-time-code"
+              autoCapitalize="characters"
               containerClassName="justify-start"
               value={field.value}
-              onChange={field.onChange}
+              // Upper-cased as it is typed, not only on submit. `autoCapitalize`
+              // is a hint a phone keyboard may honour and a desktop ignores, and
+              // a code shown in a different case from the one in the message
+              // reads as the wrong code to whoever is transcribing it.
+              onChange={(value: string) => field.onChange(value.toUpperCase())}
               onBlur={field.onBlur}
               id="pickupCode"
             >
               <InputOTPGroup>
-                {[0, 1, 2, 3, 4, 5].map((index) => (
+                {Array.from(
+                  { length: PICKUP_CODE_LENGTH },
+                  (_, index) => index
+                ).map((index) => (
                   <InputOTPSlot
                     key={index}
                     index={index}

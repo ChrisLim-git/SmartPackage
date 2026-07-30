@@ -73,7 +73,7 @@ describe("POST /api/packages", () => {
     expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
       lockerLabel: "S1",
-      pickupCode: expect.stringMatching(/^\d{6}$/),
+      pickupCode: expect.stringMatching(/^[23456789A-HJ-KM-NP-TV-Z]{6}$/),
       storedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
     })
   })
@@ -106,6 +106,19 @@ describe("POST /api/packages", () => {
 
     expect(response.status).toBe(400)
     expect((await response.json()).error.message).toMatch(/package size/)
+  })
+
+  it("does not echo a station id back at whoever guessed it", async () => {
+    const guessed = "019fb1ad-d64b-7fe4-bde0-9c4044892047"
+
+    const response = await POST(request(body({ stationId: guessed })))
+    const payload = await response.text()
+
+    // The domain error carries the id so the log can name it. Echoing it into the
+    // response confirms to a caller that their probe reached a real row, which is
+    // the whole game with an identifier somebody typed.
+    expect(response.status).toBe(404)
+    expect(payload).not.toContain(guessed)
   })
 
   it("answers 400 for a size that is not on the ladder", async () => {

@@ -1,6 +1,6 @@
 # Smart Package Locker
 
-A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-digit pickup code; the recipient types that code — nothing else, no account — sees the fee and a QR code, and scans it at the kiosk to open the door.
+A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-character pickup code; the recipient types that code — nothing else, no account — sees the fee and a QR code, and scans it at the kiosk to open the door.
 
 > **Status: in progress.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface and both package flows — store and collect, over HTTP and through the UI — are in place. What remains is the concurrency contention proof and the submission pass. See [Progress](#progress).
 
@@ -73,9 +73,6 @@ src/
 └── infrastructure/    imports domain + dtos
     ├── database/      drizzle client, schema, migrations, repositories
     ├── external/      better-auth
-    ├── generators/    uuid v7, pickup codes
-    ├── security/      pickup code hashing
-    ├── time/          system clock
     └── container.ts   composition root — the only file that knows every concrete type
 
 app/                   route handlers + pages — the controllers
@@ -83,8 +80,11 @@ components/            React components — the presentation layer
 components/ui/  lib/   shadcn primitives. Leaves, not a layer.
 hooks/                 every TanStack Query call, one hook per file;
                        hooks/api.ts is the axios client and the cache keys
-utils/                 test doubles and fixtures — in-memory repositories,
-                       stub generators, the test-database pool
+utils/                 small adapters with no layer of their own — the system
+                       clock, the uuid and pickup-code generators, the hasher —
+                       and beside them the doubles that stand in for each.
+                       Every double is named fake-*, stub-*, in-memory-*,
+                       test-* or *-fixture, and lint bans those from production
 ```
 
 There is no `src/presentation`: Next _is_ the frontend, so the presentation layer is Next's own folders rather than a parallel tree inside `src/`. The layer boundary is still enforced — `components/ui` is classified as the design system and `components/` as presentation, so a shadcn primitive cannot reach a repository or even a DTO, while a screen beside it can.
@@ -160,9 +160,9 @@ The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" 
 ### Data
 
 - **Money never touches a float.** Integer minor units in the domain, `numeric(12,2)` in Postgres, never Drizzle's `mode: 'number'`. Rounded half-up once on the final total, never per tier.
-- **A pickup code is six digits with no attempt cap**, which is brute-forceable at about a million tries — and a code identifies a parcel on its own, so a caller dialling codes is dialling for any parcel in the network, not one locker's. The mitigation is a per-locker attempt cap, specified and deliberately parked as stretch. Naming it here is the honest version; leaving it out would read as not having noticed.
+- **A pickup code has no attempt cap.** Six characters over a 30-symbol alphabet is 729 million codes, so guessing one is uninteresting — but a code identifies a parcel on its own, so an attacker is trying for _any_ parcel in the network rather than one locker's, and nothing rate-limits the attempt. The mitigation is a per-locker attempt cap, specified and deliberately parked as stretch. Naming it here is the honest version; leaving it out would read as not having noticed.
 - **The fit rule is written twice**: `OrdinalFitService` in the domain, and `s.rank >= $1` inside the atomic claim's SQL. Atomicity is why — a claim that consulted the domain would be a read and then a write, which is the race the claim exists to close. They are kept honest by the in-memory repository delegating to the real service, so a disagreement surfaces as a failing domain test; an integration test asserting the SQL order matches the policy is still owed.
-- **Pickup codes are stored hashed** and compared by hash, in constant time. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker. The hash is HMAC-SHA256 under a server-side pepper rather than a bare digest — six digits is a million candidates, which a bare digest column gives up in seconds. The pepper is a constant in `pickup-code-hasher.ts` rather than configuration — this is a demonstration system, and a variable a reviewer has to set is a clone that stores packages nobody can collect. A deployment would read it from a secret store, because a pepper in the repository is a pepper everyone with the repository has.
+- **Pickup codes are stored hashed** and compared by hash, in constant time. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker. The hash is HMAC-SHA256 under a server-side pepper rather than a bare digest: 729 million candidates is minutes of GPU time against a bare digest column, and the pepper is what puts the whole table out of reach of a database read alone. The pepper is a constant in `pickup-code-hasher.ts` rather than configuration — this is a demonstration system, and a variable a reviewer has to set is a clone that stores packages nobody can collect. A deployment would read it from a secret store, because a pepper in the repository is a pepper everyone with the repository has.
 - **UUIDv7 primary keys**, generated through `IdGenerator` so entities are valid before they reach a repository, with `DEFAULT uuidv7()` as a safety net. Postgres 18 provides `uuidv7()` natively — no extension.
 - **Five audit columns on every domain table**: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`. Deliberately no `deleted_by` — a soft delete is a write, so `updated_by` already records the actor. Reads filter `deleted_at IS NULL` in the shared `notDeleted` helper, so no caller ever writes that filter.
 - Better Auth owns `user`, `session`, `account`, `verification`. Its schema is CLI-generated, and the two edits it carries are recorded in a header comment on the file so a regeneration re-applies them: `uuid` id columns with a `uuidv7()` default, so `created_by` can be a foreign key to `user.id` and so a seed insert gets the same kind of key as everything else. No audit columns and no soft delete — an account is not a domain table.
@@ -202,7 +202,7 @@ The concurrency test is **watched failing against a naive implementation before 
 
 A role-aware nav sits in the header on every page, so what each role can reach is visible rather than something a reviewer has to guess at from URLs. It decides only what is _offered_ — every destination is still guarded server-side, and a customer typing `/admin` is bounced.
 
-**Collection asks for the code and nothing else.** No station, no locker number, no sign-in: the recipient has six digits from a message and is standing in front of the doors. That is only safe because no two parcels awaiting collection can share a code — a partial unique index on the hash of a stored parcel's code, and a store that retries with a new code when it loses that race. Collecting is recorded on submit (parcel collected, locker released, in one transaction); the QR code that follows carries `smartpackage://unlock?locker=…&package=…` for the kiosk to read. Physically opening a door is out of scope, and the QR is where this system's responsibility ends.
+**Collection asks for the code and nothing else.** No station, no locker number, no sign-in: the recipient has six characters from a message and is standing in front of the doors. That is only safe because no two parcels awaiting collection can share a code — a partial unique index on the hash of a stored parcel's code, and a store that retries with a new code when it loses that race. Collecting is recorded on submit (parcel collected, locker released, in one transaction); the QR code that follows carries `smartpackage://unlock?locker=…&package=…` for the kiosk to read. Physically opening a door is out of scope, and the QR is where this system's responsibility ends.
 
 Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
 

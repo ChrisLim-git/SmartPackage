@@ -1,0 +1,14 @@
+#!/bin/sh
+# Rejects any commit message carrying AI-tool attribution. A guard beats
+# vigilance: this repo's history is handed to a reviewer unedited.
+#
+# Deliberately no exceptions — the pattern here is identical to the pre-push
+# audit documented in the README, so the two can never disagree. That means a
+# commit subject must not name the CLAUDE.md file; say "agent guidance" instead.
+PATTERN='claude|anthropic|copilot|chatgpt|gpt-[0-9]|co-authored|generated with|ai[- ]assist'
+
+if grep -inE "$PATTERN" "$1" >/dev/null; then
+  echo "commit-msg: rejected — attribution artifact in the commit message:" >&2
+  grep -inE "$PATTERN" "$1" >&2
+  exit 1
+fi

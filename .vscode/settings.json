@@ -1,0 +1,10 @@
+{
+  // Use the workspace TypeScript, not VS Code's bundled copy. The repo pins
+  // ~5.9.3 on purpose; typescript@latest is the 7.x Go port and breaks ts tooling.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+  "jest.jestCommandLine": "NODE_OPTIONS=--experimental-vm-modules node_modules/.bin/jest"
+}

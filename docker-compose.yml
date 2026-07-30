@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: smartpackage-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smartpackage
+    volumes:
+      # Postgres 18's image stores data in a major-version subdirectory, so the
+      # mount goes at /var/lib/postgresql — not /var/lib/postgresql/data, which
+      # every pre-18 example uses and which makes the container refuse to start.
+      - postgres-data:/var/lib/postgresql
+      # Runs once, on first initialisation of the volume.
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartpackage"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres-data:

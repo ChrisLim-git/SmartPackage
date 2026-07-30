@@ -1,0 +1,220 @@
+import { resolve } from "node:path"
+
+import { defineConfig, globalIgnores } from "eslint/config"
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
+import boundaries from "eslint-plugin-boundaries"
+
+/**
+ * Dependencies point inward, and this file is the enforcement. See the README's
+ * architecture section for what the layers mean.
+ */
+
+/** Anything that would tie an inner layer to a framework or a driver. */
+const FRAMEWORK_PACKAGES = [
+  "next",
+  "next/*",
+  "react",
+  "react-dom",
+  "pg",
+  "drizzle-orm",
+  "drizzle-orm/*",
+]
+
+/**
+ * The domain is stricter still: no auth library, no id library, and no Node
+ * built-ins — `node:crypto` is the back door that makes a domain entity
+ * generate its own ids and stop being testable.
+ */
+const DOMAIN_FORBIDDEN_PACKAGES = [
+  ...FRAMEWORK_PACKAGES,
+  "better-auth",
+  "better-auth/*",
+  "uuidv7",
+  "node:*",
+  "crypto",
+]
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+
+  {
+    // components/, hooks/ and lib/ are listed as sources too, not just as import
+    // targets — otherwise a shadcn component could import the database and
+    // nothing would report it.
+    files: [
+      "src/**/*.{ts,tsx}",
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+    ],
+    plugins: { boundaries },
+    settings: {
+      "boundaries/root-path": resolve(import.meta.dirname),
+      // Without this the @domain/* specifiers never resolve to a real file and
+      // the boundary rules silently match nothing.
+      "import/resolver": {
+        typescript: { alwaysTryTypes: true, project: "./tsconfig.json" },
+      },
+      // Bare directory patterns, not "src/domain/**/*". v7 matches a path
+      // prefix, so "src/domain" classifies everything beneath it, while
+      // "src/domain/**/*" leaves files sitting directly in the folder
+      // unclassified — and every policy below then skips them silently.
+      "boundaries/elements": [
+        { type: "domain", pattern: "src/domain" },
+        { type: "application", pattern: "src/application" },
+        { type: "infrastructure", pattern: "src/infrastructure" },
+        { type: "presentation", pattern: "src/presentation" },
+        // app/ is the composition root: it wires concrete implementations into
+        // use cases, so it is the one place allowed to see everything.
+        { type: "app", pattern: "app" },
+        // shadcn primitives. Design-system leaves, not a layer.
+        { type: "ui", pattern: "components" },
+        { type: "ui", pattern: "hooks" },
+        { type: "ui", pattern: "lib" },
+      ],
+    },
+    rules: {
+      "boundaries/dependencies": [
+        "error",
+        {
+          default: "disallow",
+          message:
+            "{{from.element.types}} must not depend on {{to.element.types}}",
+          policies: [
+            {
+              from: { element: { type: "domain" } },
+              allow: { to: { element: { type: "domain" } } },
+            },
+            {
+              from: { element: { type: "application" } },
+              allow: { to: { element: { type: ["application", "domain"] } } },
+            },
+            {
+              from: { element: { type: "infrastructure" } },
+              allow: {
+                to: {
+                  element: {
+                    type: ["infrastructure", "application", "domain"],
+                  },
+                },
+              },
+            },
+            {
+              from: { element: { type: "presentation" } },
+              allow: {
+                to: {
+                  element: {
+                    type: ["presentation", "application", "domain", "ui"],
+                  },
+                },
+              },
+            },
+            {
+              from: { element: { type: "ui" } },
+              allow: { to: { element: { type: "ui" } } },
+            },
+            {
+              from: { element: { type: "app" } },
+              allow: {
+                to: {
+                  element: {
+                    type: [
+                      "app",
+                      "presentation",
+                      "application",
+                      "infrastructure",
+                      "domain",
+                      "ui",
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    files: ["src/application/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: FRAMEWORK_PACKAGES,
+              message:
+                "The application layer is framework-free. Depend on a port and implement it in infrastructure.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    files: ["src/domain/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: DOMAIN_FORBIDDEN_PACKAGES,
+              message:
+                "The domain imports nothing but itself. Declare a port; implement it in infrastructure.",
+            },
+          ],
+        },
+      ],
+      // Boundary rules cover imports; these cover ambient globals. Time, ids and
+      // codes must arrive through the Clock / IdGenerator / PickupCodeGenerator
+      // ports, which is what makes every domain test instant and repeatable.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message:
+            "domain must take time from the Clock port, not `new Date()`.",
+        },
+        {
+          selector: "MemberExpression[object.name='Date'][property.name='now']",
+          message:
+            "domain must take time from the Clock port, not `Date.now()`.",
+        },
+        {
+          selector:
+            "MemberExpression[object.name='Math'][property.name='random']",
+          message:
+            "domain must take randomness from a port (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
+        },
+        {
+          selector: "MemberExpression[object.name='crypto']",
+          message:
+            "domain must take ids from the IdGenerator port, not the crypto global.",
+        },
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message: "domain must not read configuration; pass it in.",
+        },
+      ],
+    },
+  },
+
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "coverage/**",
+    "drizzle/**",
+  ]),
+])
+
+export default eslintConfig

@@ -1,21 +1,156 @@
-# Next.js template
+# Smart Package Locker
 
-This is a Next.js template with shadcn/ui.
+A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker and a pickup code; the recipient enters the code, learns the fee, and the locker opens.
 
-## Adding components
+> **Status: in progress.** The scaffold, test harness, architectural enforcement and database are in place; the domain is being built next. See [Progress](#progress).
 
-To add components to your app, run the following command:
+## Running it
+
+Requires Node 20.9+, pnpm, and Docker.
 
 ```bash
-npx shadcn@latest add button
+pnpm install
+cp .env.example .env.local          # then fill it in — see the comments in the file
+docker compose up -d --wait         # Postgres 18
+pnpm db:migrate
+pnpm dev                            # http://localhost:3000
 ```
 
-This will place the ui components in the `components` directory.
+Hooks are not cloned, so enable the commit guard once per clone:
 
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+git config core.hooksPath .githooks
 ```
+
+### Commands
+
+| Command                                                                 | Notes                                                                   |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm dev` / `build` / `start`                                          | Turbopack is the default in Next 16 — there is no `--turbopack` flag    |
+| `pnpm test`                                                             | whole suite                                                             |
+| `pnpm test:unit`                                                        | domain + application only — the sub-second loop used during development |
+| `pnpm test:integration`                                                 | needs Postgres running                                                  |
+| `pnpm test:watch`, `pnpm test:coverage`                                 |                                                                         |
+| `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity        |
+| `pnpm typecheck`, `pnpm format`                                         |                                                                         |
+| `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                         |
+
+A single file, and a single test by name:
+
+```bash
+pnpm test src/domain/value-objects/money.test.ts
+pnpm test -- -t "charges two tiers across a 7-day stay"
+```
+
+## Architecture
+
+Clean architecture, four layers, dependencies pointing inward.
+
+```
+src/domain/          entities, value objects, policies, ports.   imports NOTHING
+src/application/     use cases, repository ports, DTOs.          imports domain
+src/infrastructure/  drizzle, better-auth, clock, generators.    imports domain + application
+src/presentation/    components, hooks.                          imports application (+ domain types)
+app/                 route handlers + pages. Composition root — may wire anything.
+components/ hooks/ lib/   shadcn primitives. Leaves, not a layer.
+```
+
+Aliases: `@domain/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, and `@/*` for the repo root.
+
+This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
+
+`src/infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
+
+**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date()`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` ports — that is what makes the domain tests both instant and deterministic.
+
+### Ports
+
+Every source of non-determinism is a port, which is why the domain tests need no mocking framework:
+
+| Port                                                             | Declared in | Real                                            | Test double                |
+| ---------------------------------------------------------------- | ----------- | ----------------------------------------------- | -------------------------- |
+| `Clock`                                                          | domain      | `SystemClock`                                   | `FixedClock(instant)`      |
+| `IdGenerator`                                                    | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`    |
+| `PickupCodeGenerator`                                            | domain      | `RandomPickupCodeGenerator`                     | `StubCodeGenerator([...])` |
+| `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed    |
+| `*Repository`, `UnitOfWork`                                      | application | Drizzle                                         | in-memory fakes            |
+| `NotificationPort`                                               | application | `LoggingNotifier`                               | `RecordingNotifier`        |
+
+`NotificationPort` exists to make a boundary that is out of scope _visible_ rather than absent.
+
+### The invariant everything serves
+
+**`Locker` is the consistency boundary, and its invariant is: at most one package occupies a locker at any time.** It is the only thing concurrency can break.
+
+That shapes the code. Allocation is **one atomic conditional `UPDATE … RETURNING`** inside the repository, not a read followed by a write in the use case — which is why `claimSmallestAvailable(stationId, size)` is a repository method with a business-sounding name rather than a `find` plus a `save`. The read-then-write version passes single-threaded tests and double-books under load: measured at 10 of 12 concurrent requests against real Postgres.
+
+State machines are deliberately tiny, and illegal transitions return errors rather than throwing. `Locker` is `available ⇄ occupied`. `Package` is `stored → retrieved`, terminal — so retrieving twice fails, which is the code-replay edge case.
+
+### Errors are results
+
+Domain and application return `Result<T, E>`. "No suitable locker" and "wrong pickup code" are expected _outcomes_, not exceptional ones — under contention a failed claim is normal. A thrown error means a bug or an infrastructure failure. One mapper at the HTTP edge turns the error taxonomy into status codes, so use cases know nothing about HTTP.
+
+**Retrieval failures are deliberately indistinguishable in the response.** Unknown locker, wrong code, empty locker and already-retrieved all return the same shape and status, because distinguishing them would tell an attacker which locker labels are real and which hold packages. The internal error types stay distinct for logging and tests; only the response is flattened.
+
+### Data
+
+- **Money never touches a float.** Integer minor units in the domain, `numeric(12,2)` in Postgres, never Drizzle's `mode: 'number'`. Rounded half-up once on the final total, never per tier.
+- **Pickup codes are stored hashed** and compared by hash. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker.
+- **UUIDv7 primary keys**, generated through `IdGenerator` so entities are valid before they reach a repository, with `DEFAULT uuidv7()` as a safety net. Postgres 18 provides `uuidv7()` natively — no extension.
+- **Five audit columns on every domain table**: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`. Deliberately no `deleted_by` — a soft delete is a write, so `updated_by` already records the actor. Reads filter `deleted_at IS NULL` in the base repository helper, so use cases never write that filter.
+- Better Auth owns `user`, `session`, `account`, `verification`; its schema is CLI-generated and editing it invites drift on every regeneration.
+- `snake_case` columns, **singular** table names (`locker`, not `lockers`), `timestamptz` never bare `timestamp`.
+
+### Patterns used, and refused
+
+**Strategy** for the three policies, so ordinal fit can become dimensional fit without touching a use case. **Repository + Unit of Work**, for testability and to give the transaction boundary an explicit owner. **Value Object**, so validity is enforced at construction and no use case ever sees a malformed code or a negative amount.
+
+Deliberately absent: builder hierarchies for two entities, an event bus for one out-of-scope notification, CQRS at this scale, repository decorators with nothing to cross-cut. The absence is the point — each of those would be ceremony here.
+
+## Testing
+
+Deliberately bottom-heavy. Fast tests get run constantly; slow ones get skipped and rot.
+
+```
+src/domain/**/*.test.ts          no deps, fake Clock/Id/Code        <1s
+src/application/**/*.test.ts     in-memory repositories             <1s
+src/infrastructure/**/*.test.ts  real Postgres, truncated between
+  …/concurrency.test.ts          real pool, parallel claims         the contention proof
+app/api/**/*.test.ts             route handlers, real Postgres
+```
+
+Tests are co-located (`foo.ts` → `foo.test.ts`) and named as behaviour, not method — `charges 9× for a 7-day stay across two tiers`, not `calculateFee works`.
+
+Use-case tests attach to the **repository port** with in-memory fakes rather than to a database. That is what keeps `test:unit` sub-second.
+
+The concurrency test is **watched failing against a naive implementation before it is trusted** — a contention test that passes against broken code is worse than no test. It also has to run on real Postgres: PGlite serialises every transaction through a single WASM backend, so `SKIP LOCKED` never actually skips and the test would go green against a genuinely broken claim.
+
+## Interface
+
+Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin/*` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
+
+Route handlers are the HTTP adapter only: parse, validate, map errors to status codes, call a use case. No SQL and no business rules in `route.ts`. Reads go through route handlers rather than Server Actions, which are queued and would serialise a parallel fan-out.
+
+## Authorship
+
+Every commit is authored by hand. `.githooks/commit-msg` rejects attribution artifacts, and the same check runs over the whole history before pushing:
+
+```bash
+git log --format='%an <%ae>%n%B' \
+  | grep -inE 'claude|anthropic|copilot|chatgpt|gpt-[0-9]|co-authored|generated with|ai[- ]assist' \
+  && echo "FOUND — fix before push" || echo "clean"
+```
+
+Commits follow Conventional Commits with the scopes `domain`, `application`, `infrastructure`, `presentation`, `infra`, `db`, `auth`. One commit per red→green→refactor cycle, so `git log` shows a `test(…)` commit followed by the `feat(…)` that satisfies it.
+
+## Progress
+
+|                                                                          |         |
+| ------------------------------------------------------------------------ | ------- |
+| Scaffold, test harness, boundary lint, Postgres, debug configs           | done    |
+| Domain core — value objects, entities, policies                          | next    |
+| User management, master data, store/retrieve/fees, concurrency hardening | to come |
+
+Known gaps are tracked here as they arise rather than discovered by a reader:
+
+- Integration tests currently share one test database. Per-Jest-worker databases land with the first integration test that needs them.

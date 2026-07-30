@@ -38,7 +38,7 @@ Read [DESIGN.md](./DESIGN.md) before touching UI.
 - **`SequentialIdGenerator` cannot be used against a `uuid` column.** It emits `customer-0001`, which is a fine readable id in a domain test and invalid input syntax in Postgres. Repository tests use the real `UuidV7Generator`.
 - **Never test concurrency against PGlite** — it serialises transactions, so `SKIP LOCKED` never skips and broken code goes green.
 - **`shadcn add form` writes nothing** in 4.x — it is a file-less registry stub. Forms are `field` + react-hook-form's own `<Controller />`. Any `<Form>/<FormField>` snippet is pre-4.x.
-- **`sonner`, not `toast`** — the base is pinned to `radix`, where `sonner` is the documented toast (`toast("…")`).
+- **There are no toasts, and `sonner` is uninstalled.** It shipped unused — no `<Toaster>` mounted, no `toast()` call — and was removed. If one is ever added back, `sonner` is the component for this base and not `toast`; the base is pinned to `radix`, where `sonner` is the documented one.
 - **`typescript` is pinned to `~5.9.3`** — `latest` is the 7.x Go port and breaks the toolchain. `eslint` is pinned to `^9`.
 - **`middleware.ts` is `proxy.ts`** in Next 16, and it silently no-ops if misnamed.
 - **`params` and `searchParams` are Promises** — `await` them.

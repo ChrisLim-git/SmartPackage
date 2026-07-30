@@ -29,8 +29,13 @@ const STORED_HASH_PATTERN = /^[0-9a-f]{64}$/
  *
  * Not bcrypt or argon2: this is verified on the collection path where a person
  * is standing at a locker, and the deliberate slowness that protects a
- * low-entropy human password buys little against a machine-generated code
- * whose real defence is the attempt cap.
+ * low-entropy human password buys little against a machine-generated code drawn
+ * uniformly from 729 million — the size of the space is what is doing the work
+ * here, not the cost of one attempt.
+ *
+ * Worth being exact about, because the earlier version of this note claimed the
+ * real defence was an attempt cap: there is no attempt cap. It is stretch scope
+ * and the README lists it as a known gap.
  */
 export class HmacPickupCodeHasher implements PickupCodeHasher {
   constructor(private readonly pepper: string = PICKUP_CODE_PEPPER) {

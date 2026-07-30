@@ -10,17 +10,11 @@ import { z } from "zod"
 
 import { FIELD_CONTROL, FIELD_SUBMIT } from "@/components/field-surface"
 import { FormAlert } from "@/components/form-alert"
+import { homeFor } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { authClient } from "@/lib/auth-client"
-
-/** Where each role belongs once it is through the door. */
-const HOME_FOR_ROLE: Record<string, string> = {
-  admin: "/admin",
-  agent: "/agent/store",
-  customer: "/",
-}
 
 /**
  * Shape only. Whether the pair is *right* is the server's answer and arrives as
@@ -60,9 +54,10 @@ export function SignInForm() {
     }
 
     const { data: session } = await authClient.getSession()
-    const role = session?.user.role ?? "customer"
 
-    router.push(HOME_FOR_ROLE[role] ?? "/")
+    // The first place the role can reach, taken from the same list the session
+    // bar offers — so nobody lands somewhere their navigation does not go.
+    router.push(homeFor(session?.user.role))
     router.refresh()
   })
 

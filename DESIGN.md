@@ -101,12 +101,12 @@ JetBrains Mono is a genuine tabular face, so fee columns and code digits align f
 
 Sourced from shadcn/ui, **`radix-mira`** style, `radix-ui` primitives (`--base radix`).
 
-Installed set: `button input label field table dialog select card badge sonner alert skeleton input-otp` — plus `separator`, pulled in as a `dialog` dependency.
+Installed set: `button input label field table dialog select card badge alert skeleton input-otp` — plus `separator`, pulled in as a `dialog` dependency.
 
 Two consequences of the pinned base and version, both verified:
 
 - **`form` is a file-less stub** in `radix-mira` — `shadcn add form` writes nothing. Forms are `field` + react-hook-form's own `<Controller />` + Zod. Any `<Form>/<FormField>` snippet is pre-4.x.
-- **`sonner` is the toast**, not `toast` — sonner is the component documented under the `radix` base. Pulls in `next-themes`.
+- **`sonner` was the toast, and there are no toasts.** It was installed on the assumption one would be wanted; nothing ever mounted a `<Toaster>` or called `toast()`, and the two things that need to interrupt a person — a refused form and a failed load — say so in place, next to what failed. Removed rather than left installed as a component nobody had decided to use. If a toast is ever wanted, `sonner` is the one for this base, not `toast`.
 
 Every interactive component ships **default, hover, focus, active, disabled, loading, error**. Not half of them.
 

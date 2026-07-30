@@ -1,7 +1,6 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp"
 import { RiLockUnlockLine } from "@remixicon/react"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
@@ -46,6 +45,16 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 /**
+ * The alphabet as `input-otp` wants it: a character class, built from the domain
+ * constant so the field cannot drift from what `PickupCode` validates.
+ *
+ * Both cases, because the field upper-cases on change rather than on keypress —
+ * an uppercase-only pattern would silently swallow every lowercase keystroke and
+ * read as a broken keyboard.
+ */
+const ALPHABET_PATTERN = `^[${PICKUP_CODE_ALPHABET}${PICKUP_CODE_ALPHABET.toLowerCase()}]*$`
+
+/**
  * "Day 3" for a single day, "Days 1–5" for a run.
  *
  * An en dash, not a hyphen: this is a range of numbers, and the two are
@@ -59,13 +68,13 @@ const describeDays = (band: { fromDay: number; toDay: number }) =>
 /**
  * The one screen that needs no account, and it asks for one thing.
  *
- * Six digits and nothing else: no sign-in, no station, no locker number. The
+ * Six characters and nothing else: no sign-in, no station, no locker number. The
  * person arriving has a code in a message and is standing in front of the lockers
  * — anything else on this form is something to transcribe before they can start.
  *
  * Every rejection says the same sentence, whatever was actually wrong. That is a
  * security property rather than laziness: an unknown code and an already-collected
- * one told apart would let someone dialling digits learn which codes are live.
+ * one told apart would let someone trying codes learn which ones are live.
  */
 export const CollectPackageForm = () => {
   const [collected, setCollected] = useState<CollectedPackageDto | null>(null)
@@ -177,13 +186,18 @@ export const CollectPackageForm = () => {
             //
             // `inputMode="text"` and not `numeric`: the alphabet has letters in
             // it, and a numeric keypad would leave a customer unable to type
-            // their own code. `pattern` keeps the field from accepting characters
-            // the alphabet excludes at all, rather than accepting and then
-            // rejecting them.
+            // their own code.
+            //
+            // The pattern is the domain's alphabet, not `input-otp`'s
+            // `REGEXP_ONLY_DIGITS_AND_CHARS` — that one admits `0`, `1`, `I`,
+            // `L`, `O` and `U`, the six characters the alphabet deliberately
+            // leaves out. Accepting them would mean a field that takes a
+            // character and then refuses the code containing it, with no way to
+            // say which one was wrong, because every rejection answers the same.
             <InputOTP
               maxLength={PICKUP_CODE_LENGTH}
               inputMode="text"
-              pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+              pattern={ALPHABET_PATTERN}
               autoComplete="one-time-code"
               autoCapitalize="characters"
               containerClassName="justify-start"

@@ -4,33 +4,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import { destinationsFor } from "@/components/navigation"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
-
-/**
- * What each role can reach, stated rather than discovered.
- *
- * Guarded server-side either way — this list only decides what is *offered*, and
- * a customer typing `/admin` still gets bounced. Collection is on every list,
- * including the signed-out one, because the person collecting a parcel may well be
- * signed in as something else.
- */
-const DESTINATIONS = {
-  admin: [
-    { href: "/admin", label: "Stations & lockers" },
-    { href: "/collect", label: "Collect" },
-  ],
-  agent: [
-    { href: "/agent/store", label: "Store a package" },
-    { href: "/collect", label: "Collect" },
-  ],
-  customer: [{ href: "/collect", label: "Collect" }],
-} as const
-
-const SIGNED_OUT = [{ href: "/collect", label: "Collect a package" }]
-
-const isRole = (role: unknown): role is keyof typeof DESTINATIONS =>
-  typeof role === "string" && role in DESTINATIONS
 
 /**
  * Who is signed in, where they can go, and the way out.
@@ -52,7 +28,7 @@ export function SessionBar() {
   }
 
   const role = session?.user.role
-  const destinations = isRole(role) ? DESTINATIONS[role] : SIGNED_OUT
+  const destinations = destinationsFor(role)
 
   return (
     <header className="flex flex-col gap-2 border-b px-4 py-3 text-sm">

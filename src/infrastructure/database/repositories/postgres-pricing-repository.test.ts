@@ -1,13 +1,13 @@
 import { createTestDb } from "@/test/support/test-db"
 
 import { feeTier, pricingConfig } from "../schema/pricing"
-import { DrizzlePricingRepository } from "./drizzle-pricing-repository"
+import { PostgresPricingRepository } from "./postgres-pricing-repository"
 
 const { pool, db } = createTestDb()
 
-const repository = () => new DrizzlePricingRepository(db)
+const repository = () => new PostgresPricingRepository(db)
 
-describe("DrizzlePricingRepository", () => {
+describe("PostgresPricingRepository", () => {
   beforeEach(async () => {
     await pool.query("DELETE FROM fee_tier")
     await pool.query("DELETE FROM pricing_config")

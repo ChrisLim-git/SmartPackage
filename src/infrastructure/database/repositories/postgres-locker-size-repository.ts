@@ -8,7 +8,7 @@ import type { Db, DbOrTx } from "../client"
 import { lockerSize } from "../schema/locker-size"
 import { notDeleted } from "./soft-delete"
 
-export class DrizzleLockerSizeRepository implements LockerSizeRepository {
+export class PostgresLockerSizeRepository implements LockerSizeRepository {
   constructor(private readonly db: DbOrTx) {}
 
   async findAll(): Promise<LockerSize[]> {

@@ -97,7 +97,7 @@ Aliases: `@domain/*`, `@dtos/*`, `@infrastructure/*`, and `@/*` for the repo roo
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 
-`src/infrastructure/` sits _below_ the domain and points **up**: the domain declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. The domain never learns Postgres exists — the arrow points inward at the interface, not outward at the driver.
+`src/infrastructure/` sits _below_ the domain and points **up**: the domain declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Postgres implementation. The domain never learns Postgres exists — the arrow points inward at the interface, not outward at the driver.
 
 **The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
@@ -131,7 +131,7 @@ Every source of non-determinism is an interface, which is why the domain tests n
 | `PickupCodeHasher`                                                  | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitService` / `LockerSelectionService` / `StorageFeeService` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
 | `*Repository`                                                       | domain      | Drizzle                                         | in-memory fakes                           |
-| `UnitOfWork`                                                        | domain      | `DrizzleUnitOfWork` — _arrives with T402_       | `InMemoryUnitOfWork`                      |
+| `UnitOfWork`                                                        | domain      | `PostgresUnitOfWork` — _arrives with T402_      | `InMemoryUnitOfWork`                      |
 
 There is no `Notifier`. Notification is out of scope, and an interface with a logging implementation and no caller would be an abstraction added for a need the spec does not have.
 

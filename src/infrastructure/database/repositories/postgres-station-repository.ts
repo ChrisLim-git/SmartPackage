@@ -27,7 +27,7 @@ const toEntity = (row: StationRow): Station => {
   return entity.value
 }
 
-export class DrizzleStationRepository implements StationRepository {
+export class PostgresStationRepository implements StationRepository {
   constructor(private readonly db: DbOrTx) {}
 
   async findById(id: string): Promise<Station | null> {

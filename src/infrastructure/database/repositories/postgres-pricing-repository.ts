@@ -18,7 +18,7 @@ import { notDeleted } from "./soft-delete"
  * `parseFloat`. Concentrating it in one method means the money rule holds by
  * construction rather than by everyone remembering it.
  */
-export class DrizzlePricingRepository implements PricingRepository {
+export class PostgresPricingRepository implements PricingRepository {
   constructor(private readonly db: DbOrTx) {}
 
   async currentConfig(): Promise<PricingConfig> {

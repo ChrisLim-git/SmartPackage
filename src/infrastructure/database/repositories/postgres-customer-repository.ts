@@ -31,7 +31,7 @@ const toEntity = (row: CustomerRow): Customer => {
   return entity.value
 }
 
-export class DrizzleCustomerRepository implements CustomerRepository {
+export class PostgresCustomerRepository implements CustomerRepository {
   constructor(
     private readonly db: DbOrTx,
     private readonly ids: IdGenerator

@@ -52,7 +52,7 @@ const toEntity = (row: { locker: LockerRow; locker_size: SizeRow }): Locker => {
   return entity.value
 }
 
-export class DrizzleLockerRepository implements LockerRepository {
+export class PostgresLockerRepository implements LockerRepository {
   constructor(private readonly db: DbOrTx) {}
 
   /** Every read needs the size, so every read is the same join. */

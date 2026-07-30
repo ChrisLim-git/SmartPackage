@@ -1,5 +1,5 @@
-import { toStationDto } from "@application/dto/master-data"
-import { toResponse } from "@infrastructure/auth/guard"
+import { toStationDto } from "@application/dtos/master-data"
+import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, stations } from "@infrastructure/container"
 import { isErr } from "@domain/shared/result"
 

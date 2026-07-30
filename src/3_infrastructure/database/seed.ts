@@ -4,7 +4,7 @@ import "./load-env"
 
 import { eq } from "drizzle-orm"
 
-import { auth, type Role } from "../auth/auth"
+import { auth, type Role } from "../external/auth/auth"
 import { db, pool } from "./client"
 import { locker } from "./schema/locker"
 import { lockerSize } from "./schema/locker-size"

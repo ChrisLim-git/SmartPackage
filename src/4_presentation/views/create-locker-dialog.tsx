@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
 
-import type { LockerSizeDto, StationDto } from "@application/dto/master-data"
+import type { LockerSizeDto, StationDto } from "@application/dtos/master-data"
 
 import { Button } from "@/components/ui/button"
 import {

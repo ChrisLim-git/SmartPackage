@@ -1,6 +1,6 @@
 import { createTestDb } from "@/test/support/test-db"
 
-import { feeTier, pricingConfig } from "../db/schema/pricing"
+import { feeTier, pricingConfig } from "../schema/pricing"
 import { DrizzlePricingRepository } from "./drizzle-pricing-repository"
 
 const { pool, db } = createTestDb()

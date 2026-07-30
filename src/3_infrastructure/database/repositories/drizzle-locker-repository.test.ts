@@ -5,9 +5,9 @@ import { eq } from "drizzle-orm"
 import { SYSTEM_ACTOR } from "@application/interfaces/audit-context"
 import { PackageSize } from "@domain/value-objects/size"
 
-import { locker } from "../db/schema/locker"
-import { lockerSize } from "../db/schema/locker-size"
-import { station } from "../db/schema/station"
+import { locker } from "../schema/locker"
+import { lockerSize } from "../schema/locker-size"
+import { station } from "../schema/station"
 import { DrizzleLockerRepository } from "./drizzle-locker-repository"
 
 const { pool, db } = createTestDb()

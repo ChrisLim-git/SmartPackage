@@ -4,8 +4,8 @@ import type { LockerSizeRepository } from "@application/interfaces/locker-size-r
 import { isErr } from "@domain/shared/result"
 import { LockerSize } from "@domain/value-objects/size"
 
-import type { Db, DbOrTx } from "../db/client"
-import { lockerSize } from "../db/schema/locker-size"
+import type { Db, DbOrTx } from "../client"
+import { lockerSize } from "../schema/locker-size"
 import { notDeleted } from "./soft-delete"
 
 export class DrizzleLockerSizeRepository implements LockerSizeRepository {

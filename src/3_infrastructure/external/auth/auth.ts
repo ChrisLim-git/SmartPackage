@@ -2,8 +2,8 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { uuidv7 } from "uuidv7"
 
-import { db } from "../db/client"
-import * as schema from "../db/schema"
+import { db } from "../../database/client"
+import * as schema from "../../database/schema"
 
 /** The three roles. `customer` is the default a self-service sign-up gets. */
 export const ROLES = ["admin", "agent", "customer"] as const

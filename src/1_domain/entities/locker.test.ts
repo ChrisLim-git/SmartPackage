@@ -1,6 +1,6 @@
 import { unwrap } from "@/test/support/unwrap"
 
-import type { LockerFitPolicy } from "../policies/locker-fit-policy"
+import type { LockerFitPolicy } from "../services/locker-fit-policy"
 import { isErr, isOk } from "../shared/result"
 import { LockerSize, PackageSize } from "../value-objects/size"
 import { Locker } from "./locker"

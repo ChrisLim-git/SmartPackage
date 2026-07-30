@@ -6,8 +6,8 @@ import { Customer } from "@domain/entities/customer"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { isErr } from "@domain/shared/result"
 
-import type { Db, DbOrTx } from "../db/client"
-import { customer } from "../db/schema/customer"
+import type { Db, DbOrTx } from "../client"
+import { customer } from "../schema/customer"
 import { notDeleted } from "./soft-delete"
 
 type CustomerRow = typeof customer.$inferSelect

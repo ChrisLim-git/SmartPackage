@@ -20,10 +20,10 @@
     ],
     "types": ["jest", "@testing-library/jest-dom"],
     "paths": {
-      "@domain/*": ["./src/domain/*"],
-      "@application/*": ["./src/application/*"],
-      "@infrastructure/*": ["./src/infrastructure/*"],
-      "@presentation/*": ["./src/presentation/*"],
+      "@domain/*": ["./src/1_domain/*"],
+      "@application/*": ["./src/2_application/*"],
+      "@infrastructure/*": ["./src/3_infrastructure/*"],
+      "@presentation/*": ["./src/4_presentation/*"],
       "@/*": ["./*"]
     }
   },

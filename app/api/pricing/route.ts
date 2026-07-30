@@ -1,6 +1,6 @@
-import { toPricingDto } from "@application/dto/master-data"
+import { toPricingDto } from "@application/dtos/master-data"
 import { isErr } from "@domain/shared/result"
-import { toResponse } from "@infrastructure/auth/guard"
+import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, pricing } from "@infrastructure/container"
 
 export async function GET(request: Request) {

@@ -1,4 +1,4 @@
-import type { LockerFitPolicy } from "../policies/locker-fit-policy"
+import type { LockerFitPolicy } from "../services/locker-fit-policy"
 import {
   type LockerAlreadyOccupied,
   lockerAlreadyOccupied,

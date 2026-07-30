@@ -2,7 +2,7 @@ import { createTestDb } from "@/test/support/test-db"
 
 import { SYSTEM_ACTOR } from "@application/interfaces/audit-context"
 
-import { UuidV7Generator } from "../generators/uuid-v7-generator"
+import { UuidV7Generator } from "../../generators/uuid-v7-generator"
 import { DrizzleCustomerRepository } from "./drizzle-customer-repository"
 
 const { pool, db } = createTestDb()

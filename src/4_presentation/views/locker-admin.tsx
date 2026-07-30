@@ -7,7 +7,7 @@ import type {
   LockerDto,
   LockerSizeDto,
   StationDto,
-} from "@application/dto/master-data"
+} from "@application/dtos/master-data"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

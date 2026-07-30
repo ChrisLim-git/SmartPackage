@@ -6,9 +6,9 @@ import { Locker } from "@domain/entities/locker"
 import { isErr } from "@domain/shared/result"
 import { LockerSize, type PackageSize } from "@domain/value-objects/size"
 
-import type { Db, DbOrTx } from "../db/client"
-import { locker } from "../db/schema/locker"
-import { lockerSize } from "../db/schema/locker-size"
+import type { Db, DbOrTx } from "../client"
+import { locker } from "../schema/locker"
+import { lockerSize } from "../schema/locker-size"
 import { notDeleted } from "./soft-delete"
 
 type LockerRow = typeof locker.$inferSelect

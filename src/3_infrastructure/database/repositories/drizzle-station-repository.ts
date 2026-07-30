@@ -4,8 +4,8 @@ import type { StationRepository } from "@application/interfaces/station-reposito
 import { Station } from "@domain/entities/station"
 import { isErr } from "@domain/shared/result"
 
-import type { Db, DbOrTx } from "../db/client"
-import { station } from "../db/schema/station"
+import type { Db, DbOrTx } from "../client"
+import { station } from "../schema/station"
 import { notDeleted } from "./soft-delete"
 
 type StationRow = typeof station.$inferSelect

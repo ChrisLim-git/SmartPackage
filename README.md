@@ -51,7 +51,7 @@ git config core.hooksPath .githooks
 A single file, and a single test by name:
 
 ```bash
-pnpm test src/domain/value-objects/money.test.ts
+pnpm test src/1_domain/value-objects/money.test.ts
 pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it and jest reads it as a path
 ```
 
@@ -59,28 +59,50 @@ pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it 
 
 Clean architecture, four layers, dependencies pointing inward.
 
+The directories are numbered, so the dependency direction is legible from the file tree alone: a lower number never imports a higher one.
+
 ```
-src/domain/          entities, value objects, policies, interfaces.   imports NOTHING
-src/application/     use cases, repository interfaces, DTOs.          imports domain
-src/infrastructure/  drizzle, better-auth, clock, generators.    imports domain + application
-src/presentation/    components, hooks.                          imports application (+ domain types)
-app/                 route handlers + pages. Composition root — may wire anything.
-components/ hooks/ lib/   shadcn primitives. Leaves, not a layer.
+src/
+├── 1_domain/            imports NOTHING
+│   ├── entities/        business objects with lifecycles and invariants
+│   ├── value-objects/   values that validate themselves at construction
+│   ├── services/        swappable rules — fit, selection, fee (Strategy)
+│   ├── interfaces/      Clock, IdGenerator, PickupCodeGenerator/Hasher
+│   └── shared/          Result, error taxonomy
+├── 2_application/       imports domain
+│   ├── dtos/            wire shapes, so entities never reach JSON
+│   ├── interfaces/      repository + UnitOfWork contracts (the SPIs)
+│   └── services/        use cases — orchestration, not rules
+├── 3_infrastructure/    imports domain + application
+│   ├── database/        drizzle client, schema, migrations, repositories
+│   ├── external/        better-auth
+│   ├── generators/      uuid v7, pickup codes
+│   ├── security/        pickup code hashing
+│   ├── time/            system clock
+│   └── container.ts     composition root — the only file that knows every concrete type
+└── 4_presentation/      imports application (+ domain types)
+    ├── views/           React components
+    └── hooks/
+
+app/                     route handlers + pages — the controllers. Next owns this path.
+components/ hooks/ lib/  shadcn primitives. Leaves, not a layer.
 ```
+
+`app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. Handlers stay thin — guard, validate, delegate, map — and every concrete implementation they use is wired in `container.ts`.
 
 Aliases: `@domain/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, and `@/*` for the repo root.
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 
-`src/infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
+`src/3_infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
 
-**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
+**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/1_domain` or `src/2_application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/1_domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
 Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
 
 ### Where a business rule goes
 
-`entities/`, `value-objects/` and `policies/` are one layer, not three. Clean architecture's inner circle is "enterprise business rules"; how that circle is subdivided is a cohesion question, and the answer here is a single rule with three outcomes:
+`entities/`, `value-objects/` and `services/` are one layer, not three. Clean architecture's inner circle is "enterprise business rules"; how that circle is subdivided is a cohesion question, and the answer here is a single rule with three outcomes:
 
 | Ask                                                                             | Home             | Because                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -144,9 +166,9 @@ Deliberately absent: builder hierarchies for two entities, an event bus for one 
 Deliberately bottom-heavy. Fast tests get run constantly; slow ones get skipped and rot.
 
 ```
-src/domain/**/*.test.ts          no deps, fake Clock/Id/Code        <1s
-src/application/**/*.test.ts     in-memory repositories             <1s
-src/infrastructure/**/*.test.ts  real Postgres, truncated between
+src/1_domain/**/*.test.ts          no deps, fake Clock/Id/Code        <1s
+src/2_application/**/*.test.ts     in-memory repositories             <1s
+src/3_infrastructure/**/*.test.ts  real Postgres, truncated between
   …/concurrency.test.ts          real pool, parallel claims         the contention proof
 app/api/**/*.test.ts             route handlers, real Postgres
 ```

@@ -6,8 +6,8 @@ import { FeeTier } from "@domain/value-objects/fee-tier"
 import { Money } from "@domain/value-objects/money"
 import { PricingConfig } from "@domain/value-objects/pricing-config"
 
-import type { Db, DbOrTx } from "../db/client"
-import { feeTier, pricingConfig } from "../db/schema/pricing"
+import type { Db, DbOrTx } from "../client"
+import { feeTier, pricingConfig } from "../schema/pricing"
 import { notDeleted } from "./soft-delete"
 
 /**

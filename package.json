@@ -13,14 +13,14 @@
     "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"src/(domain|application|presentation)\"",
-    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"(src/infrastructure|app/api)\"",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"src/(1_domain|2_application|4_presentation)\"",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"(src/3_infrastructure|app/api)\"",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/infrastructure/db/seed.ts"
+    "db:seed": "tsx src/3_infrastructure/database/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

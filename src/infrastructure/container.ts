@@ -30,14 +30,7 @@ export const ids = new UuidV7Generator()
 export const clock = new SystemClock()
 export const codes = new RandomPickupCodeGenerator()
 
-/**
- * Read at module load, so a missing pepper stops the process rather than failing
- * the first collection: the hasher refuses to be constructed without one, and a
- * package stored under an empty pepper would be a package nobody can collect.
- */
-export const hasher = new HmacPickupCodeHasher(
-  process.env.PICKUP_CODE_PEPPER ?? ""
-)
+export const hasher = new HmacPickupCodeHasher()
 
 export const stations = new StationRepository(db)
 export const lockers = new LockerRepository(db)

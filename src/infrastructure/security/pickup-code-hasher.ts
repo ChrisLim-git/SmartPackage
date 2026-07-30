@@ -3,6 +3,18 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import type { PickupCodeHasher } from "@domain/interfaces/pickup-code-hasher"
 import type { PickupCode } from "@domain/utils/pickup-code"
 
+/**
+ * The HMAC key the codes are hashed under.
+ *
+ * A constant in the source, not configuration. This is a demonstration system
+ * with a local database, and one fewer variable to set is one fewer way for a
+ * reviewer's clone to store packages nobody can collect. In a deployment it
+ * would be read from a secret store instead: the pepper only defends the hashes
+ * while it lives somewhere the database's reader cannot reach, and a value in
+ * the repository is a value everyone with the repository has.
+ */
+export const PICKUP_CODE_PEPPER = "smartpackage/pickup-code/v1"
+
 /** A SHA-256 digest as lowercase hex. Anything else in the column is corrupt, not a candidate. */
 const STORED_HASH_PATTERN = /^[0-9a-f]{64}$/
 
@@ -21,11 +33,11 @@ const STORED_HASH_PATTERN = /^[0-9a-f]{64}$/
  * whose real defence is the attempt cap.
  */
 export class HmacPickupCodeHasher implements PickupCodeHasher {
-  constructor(private readonly pepper: string) {
+  constructor(private readonly pepper: string = PICKUP_CODE_PEPPER) {
     if (pepper.trim().length === 0) {
-      throw new Error(
-        "HmacPickupCodeHasher needs a pepper — set PICKUP_CODE_PEPPER."
-      )
+      // An empty pepper hashes every code under no key at all, and the column
+      // becomes a plain digest of six digits — reversible in about a second.
+      throw new Error("HmacPickupCodeHasher needs a pepper")
     }
   }
 

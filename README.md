@@ -2,7 +2,7 @@
 
 A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-character pickup code; the recipient types that code — nothing else, no account — and is told which locker is open and what the storage fee came to.
 
-> **Status: in progress.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface and both package flows — store and collect, over HTTP and through the UI — are in place. What remains is the concurrency contention proof and the submission pass. See [Progress](#progress).
+> **Status: feature-complete.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface, both package flows — store and collect, over HTTP and through the UI — and the concurrency contention proof are all in place. What remains is the submission pass. See [Progress](#progress).
 
 ## Running it
 
@@ -40,17 +40,17 @@ git config core.hooksPath .githooks
 
 ### Commands
 
-| Command                                                                 | Notes                                                                     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `pnpm dev` / `build` / `start`                                          | Turbopack is the default in Next 16 — there is no `--turbopack` flag      |
-| `pnpm test`                                                             | whole suite                                                               |
-| `pnpm test:unit`                                                        | domain, dtos and components — the sub-second loop used during development |
-| `pnpm test:integration`                                                 | needs Postgres running                                                    |
-| `pnpm test:watch`, `pnpm test:coverage`                                 |                                                                           |
-| `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity          |
-| `pnpm typecheck`, `pnpm format`                                         |                                                                           |
-| `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                           |
-| `DATABASE_URL=$TEST_DATABASE_URL pnpm db:migrate`                       | migrates `smartpackage_test` — `db:migrate` alone only touches the dev DB |
+| Command                                                                 | Notes                                                                       |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `pnpm dev` / `build` / `start`                                          | Turbopack is the default in Next 16 — there is no `--turbopack` flag        |
+| `pnpm test`                                                             | whole suite                                                                 |
+| `pnpm test:unit`                                                        | domain, dtos, components, hooks and utils — the sub-second development loop |
+| `pnpm test:integration`                                                 | needs Postgres running                                                      |
+| `pnpm test:watch`, `pnpm test:coverage`                                 |                                                                             |
+| `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity            |
+| `pnpm typecheck`, `pnpm format`                                         |                                                                             |
+| `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                             |
+| `DATABASE_URL=$TEST_DATABASE_URL pnpm db:migrate`                       | migrates `smartpackage_test` — `db:migrate` alone only touches the dev DB   |
 
 A single file, and a single test by name:
 
@@ -68,7 +68,9 @@ src/
 ├── domain/            imports NOTHING
 │   ├── entities/      business objects with lifecycles and invariants
 │   ├── utils/         value objects — values that validate themselves at construction
-│   ├── services/      swappable rules — fit, selection, fee (Strategy)
+│   ├── services/      the swappable rules — fit, selection, fee (Strategy) —
+│   │                  and the flows that orchestrate them: store, collect,
+│   │                  install a locker, register a station
 │   ├── interfaces/    everything the domain needs but will not implement:
 │   │                  Clock, IdGenerator, PickupCode*, Repository<T>, UnitOfWork
 │   └── shared/        Result, error taxonomy
@@ -180,7 +182,7 @@ The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" 
 
 ### Patterns used, and refused
 
-**Strategy** for the three domain services, so ordinal fit can become dimensional fit without reopening an entity. **Repository + Unit of Work**, for testability and to give the transaction boundary an explicit owner. **Value Object**, so validity is enforced at construction and nothing downstream ever sees a malformed code or a negative amount.
+**Strategy** for the three swappable rules — fit, selection and fee — so ordinal fit can become dimensional fit without reopening an entity. (The other domain services, which orchestrate the flows, are not strategies; nothing about them is meant to be swapped.) **Repository + Unit of Work**, for testability and to give the transaction boundary an explicit owner. **Value Object**, so validity is enforced at construction and nothing downstream ever sees a malformed code or a negative amount.
 
 Deliberately absent: builder hierarchies for two entities, an event bus for one out-of-scope notification, CQRS at this scale, repository decorators with nothing to cross-cut. The absence is the point — each of those would be ceremony here.
 
@@ -220,7 +222,7 @@ A role-aware nav sits in the header on every page, so what each role can reach i
 
 The code being the only credential is a real trade, and the screen says so rather than leaving it implied: a production build would confirm a collection against the recipient's email, and the notification channel that would carry that is out of scope across the whole spec. There is also no attempt cap, named under [Data](#data).
 
-Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
+Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk — it registers a station, installs lockers into it, and shows free-against-total per station and size, which is the shape of the question "where am I short of large lockers". Visual system in [DESIGN.md](./DESIGN.md).
 
 Route handlers are the HTTP adapter only: guard, validate, delegate to a domain service, map errors to status codes. No SQL and no business rules in `route.ts`. Reads go through route handlers rather than Server Actions, which are queued and would serialise a parallel fan-out.
 
@@ -254,15 +256,17 @@ git log --oneline pre-squash-full-history
 
 ## Progress
 
-|                                                                        |         |
-| ---------------------------------------------------------------------- | ------- |
-| Scaffold, test harness, boundary lint, Postgres, debug configs         | done    |
-| Domain core — value objects, entities, services                        | done    |
-| Authentication, roles, guards, login UI                                | done    |
-| Master data — schema, migrations, seed, repositories, admin API and UI | done    |
-| Store and collect — flows, persistence, transaction, API, both screens | done    |
-| Atomic locker claim and pickup-code uniqueness                         | done    |
-| Concurrency contention proof; submission docs                          | to come |
+|                                                                         |         |
+| ----------------------------------------------------------------------- | ------- |
+| Scaffold, test harness, boundary lint, Postgres, debug configs          | done    |
+| Domain core — value objects, entities, services                         | done    |
+| Authentication, roles, guards, login UI                                 | done    |
+| Master data — schema, migrations, seed, repositories, admin API and UI  | done    |
+| Store and collect — flows, persistence, transaction, API, both screens  | done    |
+| Atomic locker claim and pickup-code uniqueness                          | done    |
+| Concurrency contention proof — 20 parallel claims against real Postgres | done    |
+| Review pass — spec fidelity, standards, dead code                       | done    |
+| Submission docs                                                         | to come |
 
 Known gaps are tracked here as they arise rather than discovered by a reader:
 

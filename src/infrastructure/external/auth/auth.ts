@@ -5,7 +5,15 @@ import { uuidv7 } from "uuidv7"
 import { db } from "../../database/client"
 import * as schema from "../../database/schema"
 
-/** The three roles. `customer` is the default a self-service sign-up gets. */
+/**
+ * The three roles. Only `admin` and `agent` are ever granted — the two seeded
+ * accounts — because collecting a parcel needs no account at all.
+ *
+ * `customer` stays as the least-privileged value a role column can hold, so an
+ * account arriving by any path that is not provisioning gets the role that
+ * authorises nothing. It is also the wrong-role fixture the guard tests use to
+ * prove `requireRole` refuses.
+ */
 export const ROLES = ["admin", "agent", "customer"] as const
 
 export type Role = (typeof ROLES)[number]
@@ -42,6 +50,15 @@ export const createAuth = (database: typeof db) =>
       // demo that cannot sign in is worse than an unverified address.
       enabled: true,
       requireEmailVerification: false,
+      // Closed, because there is nobody for it to serve. Collecting a parcel
+      // needs no account — the code is the credential — so a self-service
+      // account would grant exactly the access an anonymous visitor already has.
+      // Removing the sign-up page without this would leave the endpoint behind
+      // it open, which is a decision hidden rather than taken.
+      //
+      // The seed provisions the two accounts that exist through
+      // `auth.$context`, so closing the endpoint does not close the demo.
+      disableSignUp: true,
     },
 
     user: {

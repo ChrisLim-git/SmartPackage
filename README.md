@@ -13,21 +13,24 @@ pnpm install
 cp .env.example .env.local          # then fill it in — see the comments in the file
 docker compose up -d --wait         # Postgres 18
 pnpm db:migrate
-pnpm db:seed                        # three accounts, one per role
+pnpm db:seed                        # two staff accounts, master data, lockers
 pnpm dev                            # http://localhost:3000
 ```
 
 ### Signing in
 
-`pnpm db:seed` creates one account per role, all with the password **`smartpackage`**. Re-running it leaves existing accounts alone.
+`pnpm db:seed` creates the two staff accounts, both with the password **`smartpackage`**. Re-running it leaves existing accounts alone.
 
-| Email                        | Role       | Lands on       |
-| ---------------------------- | ---------- | -------------- |
-| `admin@smartpackage.test`    | `admin`    | `/admin`       |
-| `agent@smartpackage.test`    | `agent`    | `/agent/store` |
-| `customer@smartpackage.test` | `customer` | `/`            |
+| Email                     | Role    | Lands on       |
+| ------------------------- | ------- | -------------- |
+| `admin@smartpackage.test` | `admin` | `/admin`       |
+| `agent@smartpackage.test` | `agent` | `/agent/store` |
 
-These are demo credentials on a local database, published so a reviewer never has to guess. Roles are **granted, never chosen**: `role` is configured with `input: false`, so a sign-up that posts `role: "admin"` still gets a customer — asserted by a test, and by a request over real HTTP.
+These are demo credentials on a local database, published so a reviewer never has to guess.
+
+**Two accounts, and no way to make a third.** There is no sign-up: collecting a parcel needs no account — the code is the credential and `/collect` is public — so a self-service account would grant precisely the access an anonymous visitor already has. The endpoint is closed with `disableSignUp`, not merely unlinked, and a test asserts a sign-up request creates nothing.
+
+Both accounts are provisioned by the seed through Better Auth's own context, which is also how the tests make an account. Roles are **granted, never chosen**: `role` carries `input: false`, so it cannot travel in any request payload and is settable only on that provisioning path.
 
 Hooks are not cloned, so enable the commit guard once per clone:
 
@@ -209,7 +212,7 @@ It has to run on real Postgres, and through a pool wide enough to matter: twenty
 
 ## Interface
 
-A role-aware nav sits in the header on every page, so what each role can reach is visible rather than something a reviewer has to guess at from URLs. It decides only what is _offered_ — every destination is still guarded server-side, and a customer typing `/admin` is bounced.
+A role-aware nav sits in the header on every page, so what each role can reach is visible rather than something a reviewer has to guess at from URLs. It decides only what is _offered_ — every destination is still guarded server-side, and an agent typing `/admin` is bounced.
 
 **Collection asks for the code and nothing else.** No station, no locker number, no sign-in: the recipient has six characters from a message and is standing in front of the doors. That is only safe because no two parcels awaiting collection can share a code — a partial unique index on the hash of a stored parcel's code, and a store that retries with a new code when it loses that race. Collecting is recorded on submit — parcel collected, locker released, in one transaction — and the screen names the locker that opened. Physically opening a door is out of scope, and naming the locker is where this system's responsibility ends.
 

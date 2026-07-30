@@ -1,3 +1,4 @@
+import { signedInAs as signIn } from "@/utils/test-account"
 import { createTestDb } from "@/utils/test-db"
 
 import { isErr, isOk } from "@domain/shared/result"
@@ -12,23 +13,15 @@ const { requireSession, requireRole } = createGuards(auth)
 const emailFor = (label: string) =>
   `guard-${label}-${process.pid}-${performance.now().toString().replace(".", "")}@example.test`
 
-/** Signs someone up, promotes them, and returns the Cookie header for their session. */
-const signedInAs = async (role: Role): Promise<Headers> => {
-  const email = emailFor(role)
-  const response = await auth.api.signUpEmail({
-    body: { email, password: "correct-horse-battery", name: role },
-    asResponse: true,
-  })
-
-  // Promotion is a database write, never a signup field — see `input: false`.
-  await pool.query(`UPDATE "user" SET role = $1 WHERE email = $2`, [
-    role,
-    email,
-  ])
-
-  const cookie = (response.headers.get("set-cookie") ?? "").split(";")[0]
-  return new Headers({ cookie })
-}
+/**
+ * Provisions someone in the role and returns the Cookie header for their session.
+ *
+ * The role is set as the account is created rather than granted by a follow-up
+ * `UPDATE`, because that is how the seed does it — a role is never a field on a
+ * request, which is what `input: false` enforces.
+ */
+const signedInAs = (role: Role): Promise<Headers> =>
+  signIn(auth, emailFor(role), role)
 
 describe("the authorization guard", () => {
   afterAll(async () => {

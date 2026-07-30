@@ -32,11 +32,6 @@ import { station } from "./schema/station"
 const ACCOUNTS: ReadonlyArray<{ name: string; email: string; role: Role }> = [
   { name: "Avery Admin", email: "admin@smartpackage.test", role: "admin" },
   { name: "Ada Agent", email: "agent@smartpackage.test", role: "agent" },
-  {
-    name: "Cam Customer",
-    email: "customer@smartpackage.test",
-    role: "customer",
-  },
 ]
 
 const SEED_PASSWORD = "smartpackage"
@@ -54,23 +49,32 @@ const seedAccounts = async () => {
       continue
     }
 
-    // Through the auth API rather than an INSERT: the password has to be
-    // hashed the way sign-in will verify it, and only Better Auth knows how.
-    await auth.api.signUpEmail({
-      body: {
-        name: account.name,
-        email: account.email,
-        password: SEED_PASSWORD,
-      },
-      asResponse: true,
+    // Provisioned through Better Auth's own context rather than the sign-up
+    // endpoint, because that endpoint is closed — self-service sign-up is
+    // disabled, and these two accounts are the only ones that exist. Going
+    // through the context still means Better Auth hashes the password the way
+    // sign-in will verify it and mints the id the way it mints every other one;
+    // an INSERT here would have to reimplement both.
+    const context = await auth.$context
+    const hashed = await context.password.hash(SEED_PASSWORD)
+
+    const created = await context.internalAdapter.createUser({
+      name: account.name,
+      email: account.email,
+      emailVerified: false,
+      // Settable here and nowhere else. `input: false` keeps `role` out of any
+      // request payload, so granting one is a provisioning act by construction.
+      role: account.role,
     })
 
-    // The role is a privileged field that a sign-up cannot set, so it is
-    // granted here — the same promotion path an admin screen would use.
-    await pool.query(`UPDATE "user" SET role = $1 WHERE email = $2`, [
-      account.role,
-      account.email,
-    ])
+    // Without this the row is a user who can never sign in: the password lives
+    // on a linked `credential` account, not on the user.
+    await context.internalAdapter.linkAccount({
+      userId: created.id,
+      providerId: "credential",
+      accountId: created.id,
+      password: hashed,
+    })
 
     console.log(`  ${account.email} — created as ${account.role}`)
   }

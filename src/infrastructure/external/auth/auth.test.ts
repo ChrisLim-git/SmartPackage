@@ -1,4 +1,5 @@
 import { createTestDb } from "@/utils/test-db"
+import { provisionAccount, TEST_PASSWORD } from "@/utils/test-account"
 
 import { createAuth } from "./auth"
 
@@ -9,11 +10,11 @@ const auth = createAuth(db)
 const emailFor = (label: string) =>
   `${label}-${process.pid}-${performance.now().toString().replace(".", "")}@example.test`
 
-const signUp = (email: string, password = "correct-horse-battery") =>
-  auth.api.signUpEmail({
-    body: { email, password, name: "Test Person" },
-    asResponse: true,
-  })
+/**
+ * Accounts are provisioned, never signed up for. The sign-up endpoint is closed
+ * — see the last test in this file — so these exercise the path the seed uses.
+ */
+const provision = (email: string) => provisionAccount(auth, email, "customer")
 
 describe("email and password auth", () => {
   afterAll(async () => {
@@ -21,12 +22,11 @@ describe("email and password auth", () => {
     await pool.end()
   })
 
-  it("signs a new person up and writes them to Postgres", async () => {
-    const email = emailFor("signup")
+  it("provisions an account and writes it to Postgres", async () => {
+    const email = emailFor("provision")
 
-    const response = await signUp(email)
+    await provision(email)
 
-    expect(response.status).toBe(200)
     const rows = await pool.query(
       `SELECT id, email, role FROM "user" WHERE email = $1`,
       [email]
@@ -37,7 +37,7 @@ describe("email and password auth", () => {
   it("gives the account a v7 uuid, like every other table", async () => {
     const email = emailFor("uuid")
 
-    await signUp(email)
+    await provision(email)
 
     const rows = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [
       email,
@@ -50,7 +50,7 @@ describe("email and password auth", () => {
 
   it("stores the password on the account row, never on the user", async () => {
     const email = emailFor("hash")
-    await signUp(email)
+    await provision(email)
 
     const user = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [
       email,
@@ -63,15 +63,15 @@ describe("email and password auth", () => {
     expect(account.rows).toHaveLength(1)
     expect(account.rows[0].provider_id).toBe("credential")
     // Hashed, and nowhere near the user table.
-    expect(account.rows[0].password).not.toContain("correct-horse-battery")
+    expect(account.rows[0].password).not.toContain(TEST_PASSWORD)
   })
 
   it("signs in with the right password and issues a session", async () => {
     const email = emailFor("signin")
-    await signUp(email)
+    await provision(email)
 
     const response = await auth.api.signInEmail({
-      body: { email, password: "correct-horse-battery" },
+      body: { email, password: TEST_PASSWORD },
       asResponse: true,
     })
 
@@ -93,7 +93,7 @@ describe("email and password auth", () => {
 
   it("refuses the wrong password", async () => {
     const email = emailFor("wrongpass")
-    await signUp(email)
+    await provision(email)
 
     // `asResponse` reports a rejection as a status, not a thrown error.
     const response = await auth.api.signInEmail({
@@ -105,20 +105,20 @@ describe("email and password auth", () => {
     expect(response.headers.get("set-cookie")).toBeNull()
   })
 
-  it("refuses a second sign-up on the same address", async () => {
+  it("refuses a second account on the same address", async () => {
     const email = emailFor("dupe")
-    await signUp(email)
+    await provision(email)
 
-    const response = await signUp(email)
-
-    expect(response.status).toBeGreaterThanOrEqual(400)
+    // The unique index on email is what enforces it, so this rejects at the
+    // database rather than politely returning a duplicate user.
+    await expect(provision(email)).rejects.toThrow()
   })
 
   it("ends the session on sign-out", async () => {
     const email = emailFor("signout")
-    await signUp(email)
+    await provision(email)
     const signedIn = await auth.api.signInEmail({
-      body: { email, password: "correct-horse-battery" },
+      body: { email, password: TEST_PASSWORD },
       asResponse: true,
     })
     // A Set-Cookie carries attributes (`; Path=/; HttpOnly; …`) that a Cookie
@@ -132,9 +132,6 @@ describe("email and password auth", () => {
     })
 
     expect(response.status).toBe(200)
-    // Asserted against the session the cookie names, not against the row count:
-    // signing up already issues a session, so this person legitimately has two
-    // and signing out of one must not touch the other.
     const after = await auth.api.getSession({
       headers: new Headers({ cookie }),
     })
@@ -143,13 +140,18 @@ describe("email and password auth", () => {
 
   it("leaves a session that was not signed out alone", async () => {
     const email = emailFor("twodevices")
-    const first = await signUp(email)
-    const firstCookie = (first.headers.get("set-cookie") ?? "").split(";")[0]
-    const second = await auth.api.signInEmail({
-      body: { email, password: "correct-horse-battery" },
-      asResponse: true,
-    })
-    const secondCookie = (second.headers.get("set-cookie") ?? "").split(";")[0]
+    await provision(email)
+
+    const signIn = async () => {
+      const response = await auth.api.signInEmail({
+        body: { email, password: TEST_PASSWORD },
+        asResponse: true,
+      })
+      return (response.headers.get("set-cookie") ?? "").split(";")[0]
+    }
+
+    const firstCookie = await signIn()
+    const secondCookie = await signIn()
 
     await auth.api.signOut({
       headers: new Headers({ cookie: secondCookie }),
@@ -164,28 +166,28 @@ describe("email and password auth", () => {
     ).not.toBeNull()
   })
 
-  it("will not let a sign-up choose its own role", async () => {
-    // The privilege escalation this configuration exists to prevent: without
-    // `input: false` on the role field, this request registers an admin.
-    const email = emailFor("escalate")
+  it("refuses to sign anybody up", async () => {
+    // The whole self-service vector, closed. Nobody signs up for this service:
+    // collecting a parcel needs no account, so an account created here would
+    // hold exactly the access an anonymous visitor already has. The two staff
+    // accounts are provisioned by the seed.
+    //
+    // This replaces an earlier test that posted `role: "admin"` in a sign-up
+    // body to prove `input: false` refused the escalation. Closing the endpoint
+    // is the stronger statement — there is no account to escalate. `input: false`
+    // stays in place regardless, because it guards every other write of the field.
+    const email = emailFor("nosignup")
 
-    // The cast is part of the test. `role` is not in the sign-up body type —
-    // that is the first line of defence — so this deliberately goes around
-    // TypeScript to check the server enforces it too, the way a hand-written
-    // HTTP request would.
-    await auth.api.signUpEmail({
-      body: {
-        email,
-        password: "correct-horse-battery",
-        name: "Ambitious Person",
-        role: "admin",
-      } as never,
+    const response = await auth.api.signUpEmail({
+      body: { email, password: TEST_PASSWORD, name: "Uninvited Person" },
       asResponse: true,
     })
 
-    const rows = await pool.query(`SELECT role FROM "user" WHERE email = $1`, [
+    expect(response.status).toBeGreaterThanOrEqual(400)
+
+    const rows = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [
       email,
     ])
-    expect(rows.rows[0].role).toBe("customer")
+    expect(rows.rows).toHaveLength(0)
   })
 })

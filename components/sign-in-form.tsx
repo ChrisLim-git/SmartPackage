@@ -93,10 +93,13 @@ export function SignInForm() {
         {submitting ? "Signing in…" : "Sign in"}
       </Button>
 
+      {/* No sign-up link, and no sign-up. Staff accounts are provisioned, and
+          collecting a parcel needs no account at all — the collect page is
+          public and the code is the credential. */}
       <p className="text-sm text-muted-foreground">
-        No account yet?{" "}
-        <Link href="/sign-up" className="underline underline-offset-4">
-          Create one
+        Collecting a package?{" "}
+        <Link href="/collect" className="underline underline-offset-4">
+          No account needed
         </Link>
       </p>
     </form>

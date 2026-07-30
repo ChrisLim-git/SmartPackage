@@ -7,7 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Working in this repo
 
-**Read [README.md](./README.md) first.** It is the single source for the commands, the layer rules, the ports, the locker invariant, the `Result` convention, the data rules, the test strategy and the commit format. Do not restate any of it here — this file only adds what a reviewer doesn't need but you do.
+**Read [README.md](./README.md) first.** It is the single source for the commands, the layer rules, the interfaces, the locker invariant, the `Result` convention, the data rules, the test strategy and the commit format. Do not restate any of it here — this file only adds what a reviewer doesn't need but you do.
 
 Read [DESIGN.md](./DESIGN.md) before touching UI.
 

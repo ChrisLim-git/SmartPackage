@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
-import type { PickupCodeHasher } from "@domain/ports/pickup-code-hasher"
+import type { PickupCodeHasher } from "@domain/interfaces/pickup-code-hasher"
 import type { PickupCode } from "@domain/value-objects/pickup-code"
 
 /** A SHA-256 digest as lowercase hex. Anything else in the column is corrupt, not a candidate. */

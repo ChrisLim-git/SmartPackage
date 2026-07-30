@@ -149,7 +149,7 @@ const eslintConfig = defineConfig([
             {
               group: FRAMEWORK_PACKAGES,
               message:
-                "The application layer is framework-free. Depend on a port and implement it in infrastructure.",
+                "The application layer is framework-free. Depend on an interface and implement it in infrastructure.",
             },
           ],
         },
@@ -167,14 +167,14 @@ const eslintConfig = defineConfig([
             {
               group: DOMAIN_FORBIDDEN_PACKAGES,
               message:
-                "The domain imports nothing but itself. Declare a port; implement it in infrastructure.",
+                "The domain imports nothing but itself. Declare an interface; implement it in infrastructure.",
             },
           ],
         },
       ],
       // Boundary rules cover imports; these cover ambient globals. Time, ids and
       // codes must arrive through the Clock / IdGenerator / PickupCodeGenerator
-      // ports, which is what makes every domain test instant and repeatable.
+      // interfaces, which is what makes every domain test instant and repeatable.
       "no-restricted-syntax": [
         "error",
         {
@@ -184,23 +184,23 @@ const eslintConfig = defineConfig([
           // the override below.
           selector: "NewExpression[callee.name='Date']",
           message:
-            "domain must take time from the Clock port, not `new Date()`.",
+            "domain must take time from the Clock interface, not `new Date()`.",
         },
         {
           selector: "MemberExpression[object.name='Date'][property.name='now']",
           message:
-            "domain must take time from the Clock port, not `Date.now()`.",
+            "domain must take time from the Clock interface, not `Date.now()`.",
         },
         {
           selector:
             "MemberExpression[object.name='Math'][property.name='random']",
           message:
-            "domain must take randomness from a port (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
+            "domain must take randomness from an interface (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
         },
         {
           selector: "MemberExpression[object.name='crypto']",
           message:
-            "domain must take ids from the IdGenerator port, not the crypto global.",
+            "domain must take ids from the IdGenerator interface, not the crypto global.",
         },
         {
           selector:
@@ -224,23 +224,23 @@ const eslintConfig = defineConfig([
         {
           selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message:
-            "domain must take time from the Clock port, not `new Date()`.",
+            "domain must take time from the Clock interface, not `new Date()`.",
         },
         {
           selector: "MemberExpression[object.name='Date'][property.name='now']",
           message:
-            "domain must take time from the Clock port, not `Date.now()`.",
+            "domain must take time from the Clock interface, not `Date.now()`.",
         },
         {
           selector:
             "MemberExpression[object.name='Math'][property.name='random']",
           message:
-            "domain must take randomness from a port (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
+            "domain must take randomness from an interface (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
         },
         {
           selector: "MemberExpression[object.name='crypto']",
           message:
-            "domain must take ids from the IdGenerator port, not the crypto global.",
+            "domain must take ids from the IdGenerator interface, not the crypto global.",
         },
         {
           selector:

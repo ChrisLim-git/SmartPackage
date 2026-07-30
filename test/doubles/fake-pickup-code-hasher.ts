@@ -1,4 +1,4 @@
-import type { PickupCodeHasher } from "@domain/ports/pickup-code-hasher"
+import type { PickupCodeHasher } from "@domain/interfaces/pickup-code-hasher"
 import type { PickupCode } from "@domain/value-objects/pickup-code"
 
 /**

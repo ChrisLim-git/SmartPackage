@@ -1,4 +1,4 @@
-import type { IdGenerator } from "@domain/ports/id-generator"
+import type { IdGenerator } from "@domain/interfaces/id-generator"
 
 /**
  * Predictable ids, so a failed assertion reads `locker-0002` instead of a

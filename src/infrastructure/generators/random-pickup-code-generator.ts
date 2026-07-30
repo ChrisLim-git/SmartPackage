@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto"
 
-import type { PickupCodeGenerator } from "@domain/ports/pickup-code-generator"
+import type { PickupCodeGenerator } from "@domain/interfaces/pickup-code-generator"
 import { PickupCode } from "@domain/value-objects/pickup-code"
 import { isErr } from "@domain/shared/result"
 

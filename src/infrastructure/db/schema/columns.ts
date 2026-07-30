@@ -7,7 +7,7 @@ import { timestamp, uuid } from "drizzle-orm/pg-core"
  *
  * The `uuidv7()` default is Postgres 18's own function — no extension — and it
  * is a safety net, not the source. Ids are generated in the application through
- * the `IdGenerator` port so an entity is complete and assertable before it ever
+ * the `IdGenerator` interface so an entity is complete and assertable before it ever
  * reaches a repository.
  */
 export const primaryId = () =>

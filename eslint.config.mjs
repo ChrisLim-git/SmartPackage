@@ -140,6 +140,19 @@ const eslintConfig = defineConfig([
   },
 
   {
+    // A leading underscore marks a parameter that exists to satisfy an
+    // interface rather than to be used — an implementation that ignores an
+    // argument on purpose. Without this, the only way to keep the signature is
+    // a disable comment on every such method.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+
+  {
     files: ["src/application/**/*.ts"],
     rules: {
       "no-restricted-imports": [

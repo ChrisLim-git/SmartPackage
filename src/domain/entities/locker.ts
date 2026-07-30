@@ -7,7 +7,7 @@ import {
   type MalformedInput,
   malformedInput,
 } from "../shared/errors"
-import { err, ok, type Result } from "../shared/result"
+import { err, isErr, ok, type Result } from "../shared/result"
 import type { LockerSize, PackageSize } from "../value-objects/size"
 
 export type LockerStatus = "available" | "occupied"
@@ -64,6 +64,43 @@ export class Locker {
         label,
         "available",
         null
+      )
+    )
+  }
+
+  /**
+   * Rebuilds a locker that already exists, in whatever state it was left in.
+   *
+   * Separate from `create` because the two answer different questions. `create`
+   * makes a locker that has never existed, and a new locker is always
+   * available — there is no legitimate way to install one with a package
+   * already inside. Reading one back is not creation, and forcing it through
+   * the same door would mean every occupied locker came out of the database
+   * empty.
+   *
+   * This is the only path that can produce an occupied locker without a
+   * transition, which is why it is named for persistence and used nowhere else.
+   */
+  static rehydrate(
+    attributes: LockerAttributes & {
+      readonly status: LockerStatus
+      readonly currentPackageId: string | null
+    }
+  ): Result<Locker, MalformedInput> {
+    const created = Locker.create(attributes)
+
+    if (isErr(created)) {
+      return created
+    }
+
+    return ok(
+      new Locker(
+        created.value.id,
+        created.value.stationId,
+        created.value.size,
+        created.value.label,
+        attributes.status,
+        attributes.currentPackageId
       )
     )
   }

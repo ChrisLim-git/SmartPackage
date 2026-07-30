@@ -69,7 +69,6 @@ const eslintConfig = defineConfig([
         // back — a DTO exists for the outside world, so the domain owning one
         // would be the domain knowing how it is serialised.
         { type: "dtos", pattern: "src/dtos" },
-        { type: "application", pattern: "src/application" },
         { type: "infrastructure", pattern: "src/infrastructure" },
         // app/ is the composition root: it wires concrete implementations into
         // use cases, so it is the one place allowed to see everything.
@@ -106,17 +105,11 @@ const eslintConfig = defineConfig([
               allow: { to: { element: { type: ["dtos", "domain"] } } },
             },
             {
-              from: { element: { type: "application" } },
-              allow: {
-                to: { element: { type: ["application", "domain", "dtos"] } },
-              },
-            },
-            {
               from: { element: { type: "infrastructure" } },
               allow: {
                 to: {
                   element: {
-                    type: ["infrastructure", "application", "domain", "dtos"],
+                    type: ["infrastructure", "domain", "dtos"],
                   },
                 },
               },
@@ -126,13 +119,7 @@ const eslintConfig = defineConfig([
               allow: {
                 to: {
                   element: {
-                    type: [
-                      "presentation",
-                      "application",
-                      "domain",
-                      "dtos",
-                      "ui",
-                    ],
+                    type: ["presentation", "domain", "dtos", "ui"],
                   },
                 },
               },
@@ -149,7 +136,6 @@ const eslintConfig = defineConfig([
                     type: [
                       "app",
                       "presentation",
-                      "application",
                       "infrastructure",
                       "domain",
                       "dtos",
@@ -174,24 +160,6 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
-    },
-  },
-
-  {
-    files: ["src/application/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: FRAMEWORK_PACKAGES,
-              message:
-                "The application layer is framework-free. Depend on an interface and implement it in infrastructure.",
-            },
-          ],
-        },
       ],
     },
   },

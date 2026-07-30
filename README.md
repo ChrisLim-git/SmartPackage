@@ -37,16 +37,16 @@ git config core.hooksPath .githooks
 
 ### Commands
 
-| Command                                                                 | Notes                                                                   |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm dev` / `build` / `start`                                          | Turbopack is the default in Next 16 — there is no `--turbopack` flag    |
-| `pnpm test`                                                             | whole suite                                                             |
-| `pnpm test:unit`                                                        | domain + application only — the sub-second loop used during development |
-| `pnpm test:integration`                                                 | needs Postgres running                                                  |
-| `pnpm test:watch`, `pnpm test:coverage`                                 |                                                                         |
-| `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity        |
-| `pnpm typecheck`, `pnpm format`                                         |                                                                         |
-| `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                         |
+| Command                                                                 | Notes                                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm dev` / `build` / `start`                                          | Turbopack is the default in Next 16 — there is no `--turbopack` flag      |
+| `pnpm test`                                                             | whole suite                                                               |
+| `pnpm test:unit`                                                        | domain, dtos and components — the sub-second loop used during development |
+| `pnpm test:integration`                                                 | needs Postgres running                                                    |
+| `pnpm test:watch`, `pnpm test:coverage`                                 |                                                                           |
+| `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity          |
+| `pnpm typecheck`, `pnpm format`                                         |                                                                           |
+| `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                           |
 
 A single file, and a single test by name:
 
@@ -57,7 +57,7 @@ pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it 
 
 ## Architecture
 
-Clean architecture, four layers, dependencies pointing inward.
+Clean architecture, dependencies pointing inward.
 
 ```
 src/
@@ -69,9 +69,7 @@ src/
 │   │                  Clock, IdGenerator, PickupCode*, repositories, UnitOfWork
 │   └── shared/        Result, error taxonomy
 ├── dtos/              wire shapes — imports domain; the domain never imports back
-├── application/       imports domain + dtos
-│   └── services/      use cases — orchestration, not rules
-└── infrastructure/    imports domain + application
+└── infrastructure/    imports domain + dtos
     ├── database/      drizzle client, schema, migrations, repositories
     ├── external/      better-auth
     ├── generators/    uuid v7, pickup codes
@@ -85,19 +83,21 @@ components/ui/  lib/   shadcn primitives. Leaves, not a layer.
 hooks/                 React hooks
 ```
 
-There is no `src/presentation`: Next _is_ the frontend, so the presentation layer is Next's own folders rather than a parallel tree inside `src/`. The layer boundary is still enforced — `components/ui` is classified as the design system and `components/` as presentation, so a shadcn primitive cannot reach the application while a screen beside it can.
+There is no `src/presentation`: Next _is_ the frontend, so the presentation layer is Next's own folders rather than a parallel tree inside `src/`. The layer boundary is still enforced — `components/ui` is classified as the design system and `components/` as presentation, so a shadcn primitive cannot reach a repository or even a DTO, while a screen beside it can.
 
 The direction is not conveyed by the folder names, so it is enforced instead: `pnpm lint` fails the build on a wrong-direction import, and each rule was verified by writing the violation and watching it be rejected.
 
-`app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. Handlers stay thin — guard, validate, delegate, map — and every concrete implementation they use is wired in `container.ts`.
+`app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. **There is no separate use-case layer** — a route handler orchestrates directly, calling the domain's rules and the repositories it needs, with every concrete implementation wired in `container.ts`.
 
-Aliases: `@domain/*`, `@dtos/*`, `@application/*`, `@infrastructure/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
+The trade that buys: one less indirection to read, and a handler that shows the whole flow in one file. The trade it costs: orchestration lives in a framework file, so the tests that cover it are route tests. They stay fast by mocking `container` with the in-memory repositories in `test/doubles/` — the same fakes a use-case test would have used, one level out.
+
+Aliases: `@domain/*`, `@dtos/*`, `@infrastructure/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 
 `src/infrastructure/` sits _below_ the domain and points **up**: the domain declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists — the arrow points inward at the interface, not outward at the driver.
 
-**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
+**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
 Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
 
@@ -129,7 +129,7 @@ Every source of non-determinism is an interface, which is why the domain tests n
 | `PickupCodeHasher`                                               | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
 | `*Repository`, `UnitOfWork`                                      | domain      | Drizzle                                         | in-memory fakes                           |
-| `Notifier`                                                       | application | `LoggingNotifier`                               | `RecordingNotifier`                       |
+| `Notifier`                                                       | domain      | `LoggingNotifier`                               | `RecordingNotifier`                       |
 
 `Notifier` exists to make a boundary that is out of scope _visible_ rather than absent.
 
@@ -143,7 +143,7 @@ State machines are deliberately tiny, and illegal transitions return errors rath
 
 ### Errors are results
 
-Domain and application return `Result<T, E>`. "No suitable locker" and "wrong pickup code" are expected _outcomes_, not exceptional ones — under contention a failed claim is normal. A thrown error means a bug or an infrastructure failure. One mapper at the HTTP edge turns the error taxonomy into status codes, so use cases know nothing about HTTP.
+The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" are expected _outcomes_, not exceptional ones — under contention a failed claim is normal. A thrown error means a bug or an infrastructure failure. One mapper turns the error taxonomy into status codes, so the domain knows nothing about HTTP even though the handler that calls it is an HTTP file.
 
 **Retrieval failures are deliberately indistinguishable in the response.** Unknown locker, wrong code, empty locker and already-retrieved all return the same shape and status, because distinguishing them would tell an attacker which locker labels are real and which hold packages. The internal error types stay distinct for logging and tests; only the response is flattened.
 
@@ -168,7 +168,6 @@ Deliberately bottom-heavy. Fast tests get run constantly; slow ones get skipped 
 
 ```
 src/domain/**/*.test.ts          no deps, fake Clock/Id/Code        <1s
-src/application/**/*.test.ts     in-memory repositories             <1s
 src/infrastructure/**/*.test.ts  real Postgres, truncated between
   …/concurrency.test.ts          real pool, parallel claims         the contention proof
 app/api/**/*.test.ts             route handlers, real Postgres
@@ -204,7 +203,7 @@ git log --format='%an <%ae>%n%B' \
   && echo "FOUND — fix before push" || echo "clean"
 ```
 
-Commits follow Conventional Commits with the scopes `domain`, `application`, `infrastructure`, `presentation`, `infra`, `db`, `auth`. One commit per red→green→refactor cycle, so `git log` shows a `test(…)` commit followed by the `feat(…)` that satisfies it.
+Commits follow Conventional Commits with the scopes `domain`, `dtos`, `infrastructure`, `api`, `admin`, `db`, `auth`. One commit per red→green→refactor cycle, so `git log` shows a `test(…)` commit followed by the `feat(…)` that satisfies it.
 
 ## Progress
 

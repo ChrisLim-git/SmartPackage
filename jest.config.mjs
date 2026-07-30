@@ -52,7 +52,6 @@ const config = {
   // Layer aliases first, `@/*` catch-all last — Jest matches in insertion order.
   moduleNameMapper: {
     "^@domain/(.*)$": "<rootDir>/src/domain/$1",
-    "^@application/(.*)$": "<rootDir>/src/application/$1",
     "^@infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1",
     "^@dtos/(.*)$": "<rootDir>/src/dtos/$1",
     // No stylesheet, asset or `server-only` mappings. They were carried over

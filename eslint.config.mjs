@@ -178,7 +178,10 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": [
         "error",
         {
-          selector: "NewExpression[callee.name='Date']",
+          // Zero-argument only. `new Date(someInstant)` is pure arithmetic on a
+          // time that was passed in, and domain tests have to be able to pin an
+          // instant; `new Date()` is the one that reaches for the machine clock.
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message:
             "domain must take time from the Clock port, not `new Date()`.",
         },

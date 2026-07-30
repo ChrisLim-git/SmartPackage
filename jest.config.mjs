@@ -20,7 +20,9 @@ const config = {
   // Set once here rather than per script, so `test:unit` and `test:integration`
   // also exit 0 while their layers are still empty.
   passWithNoTests: true,
-  globalSetup: "<rootDir>/jest.global-setup.mjs",
+  // Per worker, before the test file is imported — not `globalSetup`, which
+  // runs in a process the workers do not inherit `process.env` from.
+  setupFiles: ["<rootDir>/jest.env-setup.mjs"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.mjs"],
 
   transform: {

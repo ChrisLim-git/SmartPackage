@@ -4,7 +4,7 @@ import nextEnv from "@next/env"
 
 /**
  * Loads `.env.local` the way `next dev` does, for scripts run outside Next —
- * `tsx src/infrastructure/db/seed.ts` gets no environment otherwise, and fails
+ * `pnpm db:seed` gets no environment otherwise, and fails
  * inside pg with "client password must be a string".
  *
  * This is a module whose *body* does the loading, and it must be imported

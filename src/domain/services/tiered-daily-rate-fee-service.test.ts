@@ -36,7 +36,16 @@ describe("TieredDailyRateFeeService", () => {
   const service = new TieredDailyRateFeeService()
 
   const feeFor = (days: number, config = STANDARD): string =>
-    service.calculate(stay(days), config).toDecimalString()
+    service.calculate(stay(days), config).total.toDecimalString()
+
+  /** The bands a stay actually touched, flattened to something readable. */
+  const bandsFor = (days: number, config = STANDARD) =>
+    service.calculate(stay(days), config).bands.map((band) => ({
+      fromDay: band.fromDay,
+      toDay: band.toDay,
+      days: band.days,
+      ratePerDay: band.ratePerDay.toDecimalString(),
+    }))
 
   describe("the worked example", () => {
     it.each([
@@ -100,6 +109,80 @@ describe("TieredDailyRateFeeService", () => {
     })
   })
 
+  /**
+   * The total alone cannot be explained to the person paying it. A stay that
+   * crossed a boundary was charged at more than one rate, and a single "rate"
+   * field can only describe one of them — so the screen would state an amount
+   * its own arithmetic contradicts.
+   */
+  describe("the bands a stay was charged at", () => {
+    it("names each band the stay reached, with the rate that band charges", () => {
+      expect(bandsFor(7)).toEqual([
+        { fromDay: 1, toDay: 5, days: 5, ratePerDay: "2.00" },
+        { fromDay: 6, toDay: 7, days: 2, ratePerDay: "4.00" },
+      ])
+    })
+
+    it("reconciles: the bands multiply out to the total that is charged", () => {
+      // The property that matters. Whatever the configuration, a customer
+      // adding up what they were shown must reach what they were charged.
+      const bands = bandsFor(7)
+      const summed = bands.reduce(
+        (total, band) => total + Number(band.ratePerDay) * band.days,
+        0
+      )
+
+      expect(summed.toFixed(2)).toBe(feeFor(7))
+    })
+
+    it("leaves out bands the stay never reached", () => {
+      // A two-day stay has no business being told what day eleven would cost.
+      expect(bandsFor(2)).toHaveLength(1)
+    })
+
+    it("ends the unbounded band on the last day charged, not on infinity", () => {
+      const [, , last] = bandsFor(12)
+
+      expect(last).toEqual({
+        fromDay: 11,
+        toDay: 12,
+        days: 2,
+        ratePerDay: "6.00",
+      })
+    })
+
+    it("collapses to one band for a stay inside the first one", () => {
+      expect(bandsFor(1)).toEqual([
+        { fromDay: 1, toDay: 1, days: 1, ratePerDay: "2.00" },
+      ])
+    })
+
+    it("shows a grace period as the free band it is", () => {
+      // The case that made this necessary. Reported as a single rate and a
+      // boundary, a grace configuration claims charging began on day one at
+      // the base rate, when the first two days were free.
+      const withGrace = pricing("2.00", [tier(1, 2, 0), tier(3, null, 1)])
+
+      expect(bandsFor(3, withGrace)).toEqual([
+        { fromDay: 1, toDay: 2, days: 2, ratePerDay: "0.00" },
+        { fromDay: 3, toDay: 3, days: 1, ratePerDay: "2.00" },
+      ])
+    })
+
+    it("still rounds the total once, however the bands display", () => {
+      // A per-band *rate* is shown; a per-band *subtotal* is not, because
+      // rounding each band would collect up to half a cent per band. The rate
+      // rounds for display and the total is unaffected by it.
+      const oddRate = pricing("0.05", [tier(1, null, 0.5)])
+
+      expect(bandsFor(2, oddRate)).toEqual([
+        { fromDay: 1, toDay: 2, days: 2, ratePerDay: "0.03" },
+      ])
+      // 0.03 x 2 would be 0.06. The charge is 0.05.
+      expect(feeFor(2, oddRate)).toBe("0.05")
+    })
+  })
+
   describe("exactness", () => {
     it("stays exact where a float would drift", () => {
       const tenCents = pricing("0.10", [tier(1, null, 1)])
@@ -108,15 +191,15 @@ describe("TieredDailyRateFeeService", () => {
     })
 
     it("returns Money, never a number", () => {
-      const fee = service.calculate(stay(3), STANDARD)
+      const { total } = service.calculate(stay(3), STANDARD)
 
-      expect(fee).toBeInstanceOf(Money)
-      expect(fee.toMinorUnits()).toBe(600)
+      expect(total).toBeInstanceOf(Money)
+      expect(total.toMinorUnits()).toBe(600)
     })
 
     it("never returns a negative fee", () => {
       expect(
-        service.calculate(stay(1), STANDARD).toMinorUnits()
+        service.calculate(stay(1), STANDARD).total.toMinorUnits()
       ).toBeGreaterThanOrEqual(0)
     })
   })

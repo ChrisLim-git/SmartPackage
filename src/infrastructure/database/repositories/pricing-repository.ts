@@ -7,7 +7,7 @@ import { PricingConfig } from "@domain/utils/pricing-config"
 
 import { feeTier, pricingConfig } from "../schema/pricing"
 import { BaseRepository } from "./base-repository"
-import { notDeleted } from "./soft-delete"
+import { notDeleted } from "../soft-delete"
 
 /**
  * The one place a `numeric` string becomes `Money`.

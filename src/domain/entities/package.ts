@@ -77,6 +77,45 @@ export class Package {
     )
   }
 
+  /**
+   * Rebuilds a parcel that already exists, in whatever state it was left in.
+   *
+   * Separate from `store` for the same reason `Locker.rehydrate` is separate from
+   * `Locker.create`: a stored package is always uncollected and unbilled, so
+   * reading a collected one back through `store` would hand it back stored — and
+   * its code would open the locker a second time. The hash arrives already
+   * hashed, because the plaintext is gone by then.
+   */
+  static rehydrate(attributes: {
+    readonly id: string
+    readonly customerId: string
+    readonly size: PackageSize
+    readonly lockerId: string
+    readonly pickupCodeHash: string
+    readonly status: PackageStatus
+    readonly storedAt: Date
+    readonly retrievedAt: Date | null
+    readonly feeCharged: Money | null
+  }): Result<Package, MalformedInput> {
+    if (attributes.id.trim().length === 0) {
+      return err(malformedInput("package", "an id is required"))
+    }
+
+    return ok(
+      new Package(
+        attributes.id,
+        attributes.customerId,
+        attributes.size,
+        attributes.lockerId,
+        attributes.pickupCodeHash,
+        attributes.status,
+        attributes.storedAt,
+        attributes.retrievedAt,
+        attributes.feeCharged
+      )
+    )
+  }
+
   /** Constant-time comparison, delegated to the hasher — the domain never sees the algorithm. */
   verifyCode(code: PickupCode, hasher: PickupCodeHasher): boolean {
     return hasher.matches(code, this.pickupCodeHash)

@@ -7,7 +7,7 @@ import { LockerSize, type PackageSize } from "@domain/utils/size"
 import { locker } from "../schema/locker"
 import { lockerSize } from "../schema/locker-size"
 import { BaseRepository } from "./base-repository"
-import { notDeleted } from "./soft-delete"
+import { notDeleted } from "../soft-delete"
 
 type LockerRow = typeof locker.$inferSelect
 type SizeRow = typeof lockerSize.$inferSelect

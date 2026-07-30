@@ -72,8 +72,12 @@ describe("UnitOfWork", () => {
   }
 
   const stateOf = async (parcelId: string) => {
-    const { rows } = await pool.query<{ status: string; locker: string }>(
-      `SELECT p.status, l.status AS locker
+    const { rows } = await pool.query<{
+      status: string
+      locker: string
+      fee: string | null
+    }>(
+      `SELECT p.status, p.fee_charged AS fee, l.status AS locker
          FROM package p JOIN locker l ON l.id = p.locker_id
         WHERE p.id = $1`,
       [parcelId]
@@ -96,9 +100,13 @@ describe("UnitOfWork", () => {
       await packages.save(collect(parcel), { actingUserId: null })
     })
 
+    // The fee as the column holds it: `numeric`, not a float. 4.00 arriving as
+    // 3.9999999 is the bug the money rule exists to prevent, and this is the
+    // boundary it would cross.
     expect(await stateOf(parcel.id)).toEqual({
       status: "retrieved",
       locker: "available",
+      fee: "4.00",
     })
   })
 
@@ -120,6 +128,7 @@ describe("UnitOfWork", () => {
     expect(await stateOf(parcel.id)).toEqual({
       status: "stored",
       locker: "occupied",
+      fee: null,
     })
   })
 
@@ -161,6 +170,7 @@ describe("UnitOfWork", () => {
     expect(await stateOf(parcel.id)).toEqual({
       status: "stored",
       locker: "occupied",
+      fee: null,
     })
   })
 })

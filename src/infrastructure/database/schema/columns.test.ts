@@ -2,7 +2,7 @@ import { createTestDb } from "@/test/support/test-db"
 import { and, eq, sql } from "drizzle-orm"
 import { pgTable, text } from "drizzle-orm/pg-core"
 
-import { notDeleted } from "../repositories/soft-delete"
+import { notDeleted } from "../soft-delete"
 import { auditColumns, primaryId } from "./columns"
 
 /**

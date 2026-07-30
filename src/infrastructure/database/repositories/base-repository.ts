@@ -5,7 +5,7 @@ import type { AuditContext } from "@domain/interfaces/audit-context"
 import { isErr, type Result } from "@domain/shared/result"
 
 import type { Db, DbOrTx } from "../client"
-import { notDeleted } from "./soft-delete"
+import { notDeleted } from "../soft-delete"
 
 /** The two columns this base needs of a table; every domain table has both. */
 export type AuditedTable = PgTable & {

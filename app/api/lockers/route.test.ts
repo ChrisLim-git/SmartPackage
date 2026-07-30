@@ -116,7 +116,7 @@ describe("/api/lockers", () => {
       // Postgres would call this "invalid input syntax" and the server would
       // report a fault for what is the caller's typo.
       expect(response.status).toBe(400)
-      expect((await response.json()).message).toMatch(/uuid/)
+      expect((await response.json()).error.message).toMatch(/uuid/)
     })
   })
 
@@ -187,7 +187,9 @@ describe("/api/lockers", () => {
       )
 
       expect(response.status).toBe(400)
-      expect(await response.json()).toMatchObject({ error: "BadRequest" })
+      expect(await response.json()).toMatchObject({
+        error: { code: "MalformedInput" },
+      })
     })
 
     it("stamps the acting admin on the row it created", async () => {

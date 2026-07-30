@@ -121,7 +121,7 @@ export const LockerAdmin = () => {
         // against the field it belongs to.
         const body = await response.json().catch(() => null)
         throw new Error(
-          body?.message ?? `The server answered ${response.status}.`
+          body?.error?.message ?? `The server answered ${response.status}.`
         )
       }
 

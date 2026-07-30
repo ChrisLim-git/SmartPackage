@@ -97,10 +97,20 @@ describe("turning a domain error into a response", () => {
     }
   )
 
-  it("gives nothing away when something throws", async () => {
+  it("gives nothing away when something throws, but logs it in full", async () => {
     const thrown = new Error("connect ECONNREFUSED 127.0.0.1:5432")
+    const logged: unknown[] = []
+    const realError = console.error
+    console.error = (...args: unknown[]) => logged.push(...args)
+
     const response = toServerFailure(thrown)
+    console.error = realError
+
     const body = await response.json()
+
+    // The detail is not discarded, it is redirected: a 500 a client cannot act
+    // on is still something an operator has to be able to diagnose.
+    expect(logged).toContain(thrown)
 
     expect(response.status).toBe(500)
     // No message, no stack, no host, no port. What a client can do about it is

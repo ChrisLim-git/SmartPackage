@@ -43,7 +43,7 @@ const STATUS: Record<AuthFailure["code"], number> = {
  */
 export const toResponse = (failure: AuthFailure): Response =>
   Response.json(
-    { error: failure.code, message: failure.message },
+    { error: { code: failure.code, message: failure.message } },
     { status: STATUS[failure.code] }
   )
 

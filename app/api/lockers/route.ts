@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { errorResponse } from "@dtos/http-error"
 import { toLockerDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
@@ -20,7 +21,7 @@ const createLockerSchema = z.object({
 })
 
 const badRequest = (message: string) =>
-  Response.json({ error: "BadRequest", message }, { status: 400 })
+  errorResponse("MalformedInput", message, 400)
 
 export async function GET(request: Request) {
   const session = await guards.requireSession(request.headers)
@@ -82,12 +83,10 @@ export async function POST(request: Request) {
     // The label is taken at that station. A conflict, not a server fault and
     // not a malformed request — the caller sent something reasonable that the
     // current state refuses.
-    return Response.json(
-      {
-        error: "Conflict",
-        message: `A locker labelled "${details.data.label}" already exists at that station.`,
-      },
-      { status: 409 }
+    return errorResponse(
+      "LockerLabelTaken",
+      `A locker labelled "${details.data.label}" already exists at that station.`,
+      409
     )
   }
 

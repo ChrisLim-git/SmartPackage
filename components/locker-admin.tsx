@@ -1,6 +1,5 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
 import type { LockerDto, LockerSizeDto, StationDto } from "@dtos/master-data"
@@ -23,6 +22,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  useCreateLocker,
+  useLockers,
+  useLockerSizes,
+  useStations,
+} from "@/hooks/use-master-data"
 
 import { CreateLockerDialog } from "./create-locker-dialog"
 
@@ -31,16 +36,6 @@ import { CreateLockerDialog } from "./create-locker-dialog"
  * so "no filter" needs a name of its own rather than `""`.
  */
 const ALL_STATIONS = "all"
-
-const fetchJson = async <T,>(url: string): Promise<T> => {
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error(`${url} answered ${response.status}`)
-  }
-
-  return response.json()
-}
 
 /** One row per station and size, because "where am I short of large lockers" is a comparison. */
 type CapacityRow = {
@@ -88,48 +83,13 @@ const LoadingRows = ({ columns }: { columns: number }) => (
 )
 
 export const LockerAdmin = () => {
-  const queries = useQueryClient()
   const [stationFilter, setStationFilter] = useState<string>(ALL_STATIONS)
 
-  const stations = useQuery({
-    queryKey: ["stations"],
-    queryFn: () => fetchJson<StationDto[]>("/api/stations"),
-  })
-  const sizes = useQuery({
-    queryKey: ["locker-sizes"],
-    queryFn: () => fetchJson<LockerSizeDto[]>("/api/locker-sizes"),
-  })
-  const lockers = useQuery({
-    queryKey: ["lockers"],
-    queryFn: () => fetchJson<LockerDto[]>("/api/lockers"),
-  })
-
-  const created = useMutation({
-    mutationFn: async (details: {
-      stationId: string
-      sizeCode: string
-      label: string
-    }) => {
-      const response = await fetch("/api/lockers", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(details),
-      })
-
-      if (!response.ok) {
-        // The message the API wrote, carried up so the dialog can put it
-        // against the field it belongs to.
-        const body = await response.json().catch(() => null)
-        throw new Error(
-          body?.error?.message ?? `The server answered ${response.status}.`
-        )
-      }
-
-      return response.json() as Promise<LockerDto>
-    },
-    // The new locker appears without anyone reaching for refresh.
-    onSuccess: () => queries.invalidateQueries({ queryKey: ["lockers"] }),
-  })
+  // Fetching lives in `hooks/`, so this component renders and nothing else.
+  const stations = useStations()
+  const sizes = useLockerSizes()
+  const lockers = useLockers()
+  const created = useCreateLocker()
 
   const isLoading = stations.isLoading || sizes.isLoading || lockers.isLoading
   const capacity =

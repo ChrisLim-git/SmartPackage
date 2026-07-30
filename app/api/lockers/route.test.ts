@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals"
 
-import { createTestDb } from "@/test/support/test-db"
+import { createTestDb } from "@/utils/test-db"
 
 const { pool, db } = createTestDb()
 

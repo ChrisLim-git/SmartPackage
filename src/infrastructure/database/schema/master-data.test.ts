@@ -1,4 +1,4 @@
-import { createTestDb } from "@/test/support/test-db"
+import { createTestDb } from "@/utils/test-db"
 import { eq, sql } from "drizzle-orm"
 
 import { locker } from "./locker"

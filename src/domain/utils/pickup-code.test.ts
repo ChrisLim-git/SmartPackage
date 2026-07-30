@@ -1,4 +1,4 @@
-import { StubPickupCodeGenerator } from "@/test/doubles/stub-pickup-code-generator"
+import { StubPickupCodeGenerator } from "@/utils/stub-pickup-code-generator"
 
 import { isErr, type Result } from "../shared/result"
 import { PickupCode } from "./pickup-code"

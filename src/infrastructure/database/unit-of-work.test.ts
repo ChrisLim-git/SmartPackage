@@ -3,15 +3,15 @@ import { Money } from "@domain/utils/money"
 import { PickupCode } from "@domain/utils/pickup-code"
 import { PackageSize } from "@domain/utils/size"
 
-import { FixedClock } from "@/test/doubles/clocks"
-import { FakePickupCodeHasher } from "@/test/doubles/fake-pickup-code-hasher"
+import { FixedClock } from "@/utils/clocks"
+import { FakePickupCodeHasher } from "@/utils/fake-pickup-code-hasher"
 import {
   clearNetwork,
   type Network,
   seedNetwork,
-} from "@/test/support/network-fixture"
-import { createTestDb } from "@/test/support/test-db"
-import { unwrap } from "@/test/support/unwrap"
+} from "@/utils/network-fixture"
+import { createTestDb } from "@/utils/test-db"
+import { unwrap } from "@/utils/unwrap"
 
 import { UuidV7Generator } from "../generators/uuid-v7-generator"
 import { PackageRepository } from "./repositories/package-repository"

@@ -70,7 +70,10 @@ const config = {
   coveragePathIgnorePatterns: [
     "/node_modules/",
     "/.next/",
-    "/test/",
+    // Test doubles and fixtures. They are exercised by every suite that uses
+    // them, and counting them as covered production code would flatter the
+    // number.
+    "/utils/",
     "/components/ui/",
   ],
   collectCoverageFrom: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],

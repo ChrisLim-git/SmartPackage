@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { RiAlertLine, RiArchiveLine, RiFileCopyLine } from "@remixicon/react"
-import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
@@ -25,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useStorePackage } from "@/hooks/use-packages"
 import { cn } from "@/lib/utils"
 
 /** The same shape the route validates, so both sides reject the same thing. */
@@ -75,36 +75,7 @@ export const StorePackageForm = ({
     },
   })
 
-  const store = useMutation({
-    mutationFn: async (values: FormValues): Promise<StoredPackageDto> => {
-      const response = await fetch("/api/packages", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          stationId: values.stationId,
-          packageSizeCode: values.packageSizeCode,
-          recipient: {
-            name: values.recipientName,
-            email: values.recipientEmail,
-            phone: values.recipientPhone?.trim() || null,
-          },
-        }),
-      })
-
-      const body = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(
-          body?.error?.message ?? `The server answered ${response.status}.`
-        )
-      }
-
-      return body as StoredPackageDto
-    },
-    // The form is not reset here. A full station is the one failure where
-    // retyping a recipient's email on a phone would be a real cruelty.
-    onSuccess: (result) => setStored(result),
-  })
+  const store = useStorePackage()
 
   if (stored !== null) {
     return (
@@ -190,7 +161,23 @@ export const StorePackageForm = ({
       // straight back to the DOM, so a rejected one surfaces as an
       // unhandledRejection in the console even though the mutation's own error
       // state is what the form renders.
-      onSubmit={handleSubmit((values) => store.mutate(values))}
+      onSubmit={handleSubmit((values) =>
+        store.mutate(
+          {
+            stationId: values.stationId,
+            packageSizeCode: values.packageSizeCode,
+            recipient: {
+              name: values.recipientName,
+              email: values.recipientEmail,
+              phone: values.recipientPhone?.trim() || null,
+            },
+          },
+          // Only the success path clears anything. A full station is the one
+          // failure where retyping a recipient's email on a phone would be a
+          // real cruelty, so the fields keep what they hold.
+          { onSuccess: setStored }
+        )
+      )}
       noValidate
     >
       {store.isError && (

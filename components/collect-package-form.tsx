@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { RiAlertLine, RiLockUnlockLine } from "@remixicon/react"
-import { useMutation } from "@tanstack/react-query"
 import { QRCodeSVG } from "qrcode.react"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
@@ -18,6 +17,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp"
+import { useCollectPackage } from "@/hooks/use-packages"
 
 const schema = z.object({
   pickupCode: z.string().regex(/^\d{6}$/, "Enter all six digits"),
@@ -48,26 +48,7 @@ export const CollectPackageForm = () => {
     defaultValues: { pickupCode: "" },
   })
 
-  const collect = useMutation({
-    mutationFn: async (values: FormValues): Promise<CollectedPackageDto> => {
-      const response = await fetch("/api/pickups", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(values),
-      })
-
-      const body = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(
-          body?.error?.message ?? `The server answered ${response.status}.`
-        )
-      }
-
-      return body as CollectedPackageDto
-    },
-    onSuccess: (result) => setCollected(result),
-  })
+  const collect = useCollectPackage()
 
   if (collected !== null) {
     return (
@@ -128,7 +109,9 @@ export const CollectPackageForm = () => {
       // straight back to the DOM, so a rejected one surfaces as an
       // unhandledRejection in the console even though the mutation's own error
       // state is what the form renders.
-      onSubmit={handleSubmit((values) => collect.mutate(values))}
+      onSubmit={handleSubmit(({ pickupCode }) =>
+        collect.mutate(pickupCode, { onSuccess: setCollected })
+      )}
       noValidate
     >
       {collect.isError && (

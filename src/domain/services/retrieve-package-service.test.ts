@@ -11,8 +11,8 @@ import { Money } from "@domain/utils/money"
 import { PricingConfig } from "@domain/utils/pricing-config"
 import { LockerSize } from "@domain/utils/size"
 
-import { AdvanceableClock } from "@/test/doubles/clocks"
-import { FakePickupCodeHasher } from "@/test/doubles/fake-pickup-code-hasher"
+import { AdvanceableClock } from "@/utils/clocks"
+import { FakePickupCodeHasher } from "@/utils/fake-pickup-code-hasher"
 import {
   InMemoryCustomerRepository,
   InMemoryLockerRepository,
@@ -21,10 +21,10 @@ import {
   InMemoryPricingRepository,
   InMemoryStationRepository,
   InMemoryUnitOfWork,
-} from "@/test/doubles/in-memory-repositories"
-import { SequentialIdGenerator } from "@/test/doubles/sequential-id-generator"
-import { StubPickupCodeGenerator } from "@/test/doubles/stub-pickup-code-generator"
-import { unwrap } from "@/test/support/unwrap"
+} from "@/utils/in-memory-repositories"
+import { SequentialIdGenerator } from "@/utils/sequential-id-generator"
+import { StubPickupCodeGenerator } from "@/utils/stub-pickup-code-generator"
+import { unwrap } from "@/utils/unwrap"
 
 /**
  * Levels 2 and 3 together: a collection is validated, priced and completed, or

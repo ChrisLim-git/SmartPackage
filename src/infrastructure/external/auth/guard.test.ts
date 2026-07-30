@@ -1,4 +1,4 @@
-import { createTestDb } from "@/test/support/test-db"
+import { createTestDb } from "@/utils/test-db"
 
 import { isErr, isOk } from "@domain/shared/result"
 

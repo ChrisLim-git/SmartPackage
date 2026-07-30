@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals"
 
-import { createTestDb } from "@/test/support/test-db"
+import { createTestDb } from "@/utils/test-db"
 
 const { pool, db } = createTestDb()
 
@@ -23,8 +23,7 @@ jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({
 const { POST } = await import("./route")
 const { POST: store } = await import("../packages/route")
 const { pool: appPool } = await import("@infrastructure/database/client")
-const { clearNetwork, seedNetwork } =
-  await import("@/test/support/network-fixture")
+const { clearNetwork, seedNetwork } = await import("@/utils/network-fixture")
 const { feeTier, pricingConfig } =
   await import("@infrastructure/database/schema/pricing")
 

@@ -26,6 +26,22 @@ const FRAMEWORK_PACKAGES = [
  * built-ins — `node:crypto` is the back door that makes a domain entity
  * generate its own ids and stop being testable.
  */
+/**
+ * `utils/` holds the test doubles: in-memory repositories, a stub code
+ * generator, a pool onto `smartpackage_test`. Reached from production code, any
+ * of them is a route serving fabricated data or the application writing to the
+ * test database — and both would pass the suite and fail in front of a person.
+ *
+ * Restated in every block that sets `no-restricted-imports`, because flat config
+ * *replaces* a rule rather than merging it: the domain's own package ban
+ * silently dropped this guard until a deliberate probe found the hole.
+ */
+const TEST_DOUBLE_IMPORTS = {
+  group: ["@/utils/*", "**/utils/in-memory-*", "**/utils/test-db"],
+  message:
+    "test doubles are for tests only — production code takes the real implementation from the container.",
+}
+
 const DOMAIN_FORBIDDEN_PACKAGES = [
   ...FRAMEWORK_PACKAGES,
   "better-auth",
@@ -86,6 +102,18 @@ const eslintConfig = defineConfig([
         // folders rather than a parallel tree inside src/.
         { type: "presentation", pattern: "components" },
         { type: "presentation", pattern: "hooks" },
+        // Test doubles and fixtures: in-memory repositories, stub generators, a
+        // pool onto the test database. They implement domain contracts and read
+        // the schema, so they may see the inner layers — and nothing outside a
+        // test may see them, which the `no-restricted-imports` rule below
+        // enforces separately, because a dependency *direction* rule cannot
+        // express "only from a test file".
+        // `mode: "file"` with an explicit `utils/*.ts`, because a bare `utils`
+        // pattern also matches `src/domain/utils` — the plugin classifies by the
+        // nearest ancestor whose *name* matches, so the value objects would have
+        // been reclassified out of the domain and every rule about them would
+        // have started reporting on the wrong thing.
+        { type: "utils", pattern: "utils", partialMatch: false },
       ],
     },
     rules: {
@@ -96,20 +124,28 @@ const eslintConfig = defineConfig([
           message:
             "{{from.element.types}} must not depend on {{to.element.types}}",
           policies: [
+            // Every layer may reach `utils`, and only a test actually does: a
+            // dependency-direction rule cannot say "from a test file", so the
+            // `no-restricted-imports` block below is what keeps production out.
+            // Expressed here rather than by exempting test files from boundaries
+            // altogether, which would also stop reporting a test that imports
+            // across two layers it has no business joining.
             {
               from: { element: { type: "domain" } },
-              allow: { to: { element: { type: "domain" } } },
+              allow: { to: { element: { type: ["domain", "utils"] } } },
             },
             {
               from: { element: { type: "dtos" } },
-              allow: { to: { element: { type: ["dtos", "domain"] } } },
+              allow: {
+                to: { element: { type: ["dtos", "domain", "utils"] } },
+              },
             },
             {
               from: { element: { type: "infrastructure" } },
               allow: {
                 to: {
                   element: {
-                    type: ["infrastructure", "domain", "dtos"],
+                    type: ["infrastructure", "domain", "dtos", "utils"],
                   },
                 },
               },
@@ -119,7 +155,7 @@ const eslintConfig = defineConfig([
               allow: {
                 to: {
                   element: {
-                    type: ["presentation", "domain", "dtos", "ui"],
+                    type: ["presentation", "domain", "dtos", "ui", "utils"],
                   },
                 },
               },
@@ -127,6 +163,16 @@ const eslintConfig = defineConfig([
             {
               from: { element: { type: "ui" } },
               allow: { to: { element: { type: "ui" } } },
+            },
+            {
+              from: { element: { type: "utils" } },
+              allow: {
+                to: {
+                  element: {
+                    type: ["utils", "domain", "dtos", "infrastructure"],
+                  },
+                },
+              },
             },
             {
               from: { element: { type: "app" } },
@@ -140,6 +186,7 @@ const eslintConfig = defineConfig([
                       "domain",
                       "dtos",
                       "ui",
+                      "utils",
                     ],
                   },
                 },
@@ -165,7 +212,29 @@ const eslintConfig = defineConfig([
   },
 
   {
+    // A fake is for a test, and only for a test.
+    //
+    // `utils/` holds in-memory repositories, a stub code generator and a pool
+    // onto `smartpackage_test`. Any of them reached from production code would
+    // be a route serving fabricated data, or the application writing to the test
+    // database — both of which would pass a suite and fail in front of a person.
+    files: [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "app/**/*.ts",
+      "app/**/*.tsx",
+      "components/**/*.tsx",
+      "hooks/**/*.ts",
+    ],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [TEST_DOUBLE_IMPORTS] }],
+    },
+  },
+
+  {
     files: ["src/domain/**/*.ts"],
+    ignores: ["src/domain/**/*.test.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -176,6 +245,7 @@ const eslintConfig = defineConfig([
               message:
                 "The domain imports nothing but itself. Declare an interface; implement it in infrastructure.",
             },
+            TEST_DOUBLE_IMPORTS,
           ],
         },
       ],
@@ -226,6 +296,21 @@ const eslintConfig = defineConfig([
     // which this override does not touch.
     files: ["src/domain/**/*.test.ts"],
     rules: {
+      // The package ban still applies — a domain test importing React would mean
+      // the same thing it means anywhere else in the layer — but the doubles are
+      // exactly what a domain test is supposed to reach for.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: DOMAIN_FORBIDDEN_PACKAGES,
+              message:
+                "The domain imports nothing but itself. Declare an interface; implement it in infrastructure.",
+            },
+          ],
+        },
+      ],
       "no-restricted-syntax": [
         "error",
         {

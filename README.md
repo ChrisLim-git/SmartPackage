@@ -81,7 +81,9 @@ src/
 app/                   route handlers + pages — the controllers
 components/            React components — the presentation layer
 components/ui/  lib/   shadcn primitives. Leaves, not a layer.
-hooks/                 React hooks
+hooks/                 every TanStack Query call in the app, and nothing else
+utils/                 test doubles and fixtures — in-memory repositories,
+                       stub generators, the test-database pool
 ```
 
 There is no `src/presentation`: Next _is_ the frontend, so the presentation layer is Next's own folders rather than a parallel tree inside `src/`. The layer boundary is still enforced — `components/ui` is classified as the design system and `components/` as presentation, so a shadcn primitive cannot reach a repository or even a DTO, while a screen beside it can.
@@ -90,7 +92,7 @@ The direction is not conveyed by the folder names, so it is enforced instead: `p
 
 `app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. **There is no separate use-case layer.** A handler guards, validates, delegates and maps — nothing else. Every concrete implementation it delegates to is wired in `container.ts`.
 
-**The behaviour lives in `src/domain/services/`**, and it can, because the `Repository<T>` and `UnitOfWork` contracts live in `src/domain/interfaces/`. A domain service orchestrating a whole flow still imports nothing outside the domain, so storing and retrieving a package are tested the same way a fee calculation is: no database, no HTTP, no framework, in milliseconds. The in-memory repositories in `test/doubles/` are what make that possible.
+**The behaviour lives in `src/domain/services/`**, and it can, because the `Repository<T>` and `UnitOfWork` contracts live in `src/domain/interfaces/`. A domain service orchestrating a whole flow still imports nothing outside the domain, so storing and retrieving a package are tested the same way a fee calculation is: no database, no HTTP, no framework, in milliseconds. The in-memory repositories in `utils/` are what make that possible.
 
 That is the payoff from putting the contracts in the domain rather than a layer above it. A flow that needs a repository does not need to leave.
 

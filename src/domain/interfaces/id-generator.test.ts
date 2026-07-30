@@ -1,4 +1,4 @@
-import { SequentialIdGenerator } from "@/test/doubles/sequential-id-generator"
+import { SequentialIdGenerator } from "@/utils/sequential-id-generator"
 
 describe("SequentialIdGenerator", () => {
   it("yields distinct ids", () => {

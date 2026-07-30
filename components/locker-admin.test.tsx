@@ -50,8 +50,12 @@ const BODIES: Record<string, unknown> = {
  * count has no business knowing which transport is underneath. One level down,
  * the hooks and the interceptor still run for real.
  */
+/** Paths set here fail the next request, so a test can break one query at a time. */
+const failing = new Set<string>()
+
 jest.unstable_mockModule("@/hooks/api", () => ({
   get: async (path: string) => {
+    if (failing.has(path)) throw new Error("Request failed")
     if (!(path in BODIES)) throw new Error(`unexpected request: ${path}`)
 
     return BODIES[path]
@@ -141,5 +145,89 @@ describe("the locker capacity table", () => {
       .map((row) => within(row).getAllByRole("cell")[0].textContent)
 
     expect(labels).toEqual(["A1", "A2", "C1", "C2", "C3", "B1"])
+  })
+})
+
+/**
+ * A failed load and an empty estate look identical unless the screen says
+ * otherwise, and they call for opposite actions: one is "try again", the other
+ * is "add a locker". Silence lets an operator conclude there are no stations.
+ */
+describe("when a request fails", () => {
+  afterEach(() => failing.clear())
+
+  it("says so when the stations could not be loaded", async () => {
+    failing.add("/stations")
+
+    renderAdmin()
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/stations/i)
+  })
+
+  it("says so when the locker sizes could not be loaded", async () => {
+    // The sizes are the capacity table's columns. Without them the table has a
+    // heading row and nothing under it, which reads as an estate with no lockers.
+    failing.add("/locker-sizes")
+
+    renderAdmin()
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/sizes/i)
+  })
+
+  it("says so when the lockers could not be loaded", async () => {
+    failing.add("/lockers")
+
+    renderAdmin()
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/lockers/i)
+  })
+
+  it("names every part that failed, not just the first", async () => {
+    failing.add("/stations")
+    failing.add("/lockers")
+
+    renderAdmin()
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/stations/i)
+    expect(alert).toHaveTextContent(/lockers/i)
+  })
+
+  it("offers a way to try again", async () => {
+    failing.add("/lockers")
+
+    renderAdmin()
+
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByRole("button")).toHaveTextContent(/try again/i)
+  })
+
+  it("does not claim the station has no lockers when the request failed", async () => {
+    // The empty state is a statement of fact about the estate. Rendering it
+    // over a failed request states something the screen does not know.
+    failing.add("/lockers")
+
+    renderAdmin()
+    await screen.findByRole("alert")
+
+    expect(screen.queryByText(/no lockers at this station yet/i)).toBeNull()
+  })
+
+  it("refuses to open the add-locker dialog when its choices are missing", async () => {
+    // The dialog needs stations and sizes to offer. Opened without them it is a
+    // form that cannot be completed and does not say why.
+    failing.add("/stations")
+
+    renderAdmin()
+    await screen.findByRole("alert")
+
+    expect(screen.getByRole("button", { name: /add locker/i })).toBeDisabled()
+  })
+
+  it("keeps working when nothing failed", async () => {
+    renderAdmin()
+    await screen.findAllByRole("table")
+
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 })

@@ -9,7 +9,7 @@ import type {
   UnitOfWork,
 } from "@application/interfaces/unit-of-work"
 import { Customer } from "@domain/entities/customer"
-import type { Locker } from "@domain/entities/locker"
+import { Locker } from "@domain/entities/locker"
 import type { Package } from "@domain/entities/package"
 import type { Station } from "@domain/entities/station"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
@@ -17,7 +17,7 @@ import { OrdinalFitPolicy } from "@domain/policies/ordinal-fit-policy"
 import { SmallestFitFirstPolicy } from "@domain/policies/smallest-fit-first-policy"
 import { isErr } from "@domain/shared/result"
 import type { PricingConfig } from "@domain/value-objects/pricing-config"
-import type { PackageSize } from "@domain/value-objects/size"
+import type { LockerSize, PackageSize } from "@domain/value-objects/size"
 
 /**
  * In-memory repositories, for use-case tests that have no business touching a
@@ -55,7 +55,40 @@ export class InMemoryLockerRepository implements LockerRepository {
     new OrdinalFitPolicy()
   )
 
-  constructor(private lockers: Locker[] = []) {}
+  constructor(
+    private lockers: Locker[] = [],
+    private readonly sizes: LockerSize[] = []
+  ) {}
+
+  async create(
+    details: { stationId: string; sizeCode: string; label: string },
+    _actor: AuditContext
+  ): Promise<Locker | null> {
+    const taken = await this.findByLabel(details.stationId, details.label)
+    if (taken !== null) {
+      return null
+    }
+
+    const size = this.sizes.find(({ code }) => code === details.sizeCode)
+    if (size === undefined) {
+      throw new Error(`no locker size is coded "${details.sizeCode}"`)
+    }
+
+    const created = Locker.create({
+      id: `locker-${this.lockers.length + 1}`,
+      stationId: details.stationId,
+      size,
+      label: details.label,
+    })
+
+    if (isErr(created)) {
+      throw new Error(`cannot create a locker: ${created.error.message}`)
+    }
+
+    this.lockers.push(created.value)
+
+    return created.value
+  }
 
   private replace(updated: Locker): void {
     this.lockers = this.lockers.map((locker) =>

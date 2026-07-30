@@ -52,3 +52,14 @@ try {
   // No `.env.local` is normal in CI. Anything else is worth seeing.
   if (error.code !== "ENOENT") throw error
 }
+
+// Under test, `DATABASE_URL` *is* the test database.
+//
+// `test-db.ts` names TEST_DATABASE_URL explicitly, but the application's own
+// pool reads DATABASE_URL — so anything imported through the composition root
+// (a route handler, for instance) would otherwise write to the development
+// database from inside a test run. Pointing the variable itself makes that
+// impossible rather than merely discouraged.
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
+}

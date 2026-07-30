@@ -59,6 +59,9 @@ importers:
       uuidv7:
         specifier: ^1.2.1
         version: 1.2.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@next/env':
         specifier: ^16.2.12

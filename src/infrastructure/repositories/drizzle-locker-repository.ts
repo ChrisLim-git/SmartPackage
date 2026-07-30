@@ -63,6 +63,40 @@ export class DrizzleLockerRepository implements LockerRepository {
       .innerJoin(lockerSize, eq(lockerSize.id, locker.sizeId))
   }
 
+  async create(
+    details: { stationId: string; sizeCode: string; label: string },
+    actor: AuditContext
+  ): Promise<Locker | null> {
+    const [size] = await (this.db as Db)
+      .select()
+      .from(lockerSize)
+      .where(and(eq(lockerSize.code, details.sizeCode), notDeleted(lockerSize)))
+      .limit(1)
+
+    if (size === undefined) {
+      throw new Error(`no locker size is coded "${details.sizeCode}"`)
+    }
+
+    // `onConflictDoNothing` rather than catching a Postgres error code: the
+    // unique index is the thing that decides, and reading its verdict from an
+    // empty result keeps the driver's error taxonomy out of this class.
+    const [row] = await (this.db as Db)
+      .insert(locker)
+      .values({
+        stationId: details.stationId,
+        sizeId: size.id,
+        label: details.label,
+        createdBy: actor.actingUserId,
+        updatedBy: actor.actingUserId,
+      })
+      .onConflictDoNothing({ target: [locker.stationId, locker.label] })
+      .returning()
+
+    return row === undefined
+      ? null
+      : toEntity({ locker: row, locker_size: size })
+  }
+
   async findById(id: string): Promise<Locker | null> {
     const [row] = await this.selectLockers()
       .where(and(eq(locker.id, id), notDeleted(locker)))

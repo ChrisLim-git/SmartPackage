@@ -4,6 +4,21 @@ import type { PackageSize } from "@domain/value-objects/size"
 import type { AuditContext } from "./audit-context"
 
 export interface LockerRepository {
+  /**
+   * Installs a locker at a station.
+   *
+   * Identified by size **code**, not by a size row id: a code is a domain fact
+   * an administrator can read off a form, and a row id is a database detail
+   * that has no business in an application signature.
+   *
+   * `null` means the label is already in use at that station — an ordinary
+   * thing for a person to do twice, not an exceptional one.
+   */
+  create(
+    details: { stationId: string; sizeCode: string; label: string },
+    actor: AuditContext
+  ): Promise<Locker | null>
+
   findById(id: string): Promise<Locker | null>
 
   /** Scoped to a station, because a label is only unique where an agent is standing. */

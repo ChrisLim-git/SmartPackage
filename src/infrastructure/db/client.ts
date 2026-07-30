@@ -24,7 +24,11 @@ export const pool =
     connectionTimeoutMillis: 5_000,
   })
 
-if (process.env.NODE_ENV !== "production") {
+// Development only, and deliberately not "anything but production": under test
+// the cache would outlive the module registry Jest gives each suite, so a suite
+// that closed the pool in `afterAll` would leave the next one holding a dead
+// one. Hot reload is the problem this solves, and hot reload is a dev thing.
+if (process.env.NODE_ENV === "development") {
   globalForDb.__pool = pool
 }
 

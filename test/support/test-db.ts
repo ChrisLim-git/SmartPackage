@@ -1,6 +1,8 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
 
+import * as schema from "@infrastructure/db/schema"
+
 /**
  * A connection to `smartpackage_test`, separate from the application pool so a
  * test can never write to the development database.
@@ -15,5 +17,7 @@ export const createTestDb = () => {
     max: 4,
   })
 
-  return { pool, db: drizzle({ client: pool, casing: "snake_case" }) }
+  // The schema is passed so this db is the same *type* as the application's,
+  // and anything built against `typeof db` can be pointed at it in a test.
+  return { pool, db: drizzle({ client: pool, schema, casing: "snake_case" }) }
 }

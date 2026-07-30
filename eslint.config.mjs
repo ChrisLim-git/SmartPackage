@@ -19,6 +19,9 @@ const FRAMEWORK_PACKAGES = [
   "pg",
   "drizzle-orm",
   "drizzle-orm/*",
+  // An HTTP client belongs to the browser side. A domain service reaching for one
+  // would be a flow calling its own API instead of taking a repository.
+  "axios",
 ]
 
 /**

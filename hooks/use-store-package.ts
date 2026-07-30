@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 
 import type { StoredPackageDto } from "@dtos/package"
 
-import { postJson } from "./api"
+import { post } from "./api"
 
 export type StoreRequest = {
   stationId: string
@@ -26,5 +26,5 @@ export type StoreRequest = {
 export const useStorePackage = () =>
   useMutation({
     mutationFn: (request: StoreRequest) =>
-      postJson<StoredPackageDto>("/api/packages", request),
+      post<StoredPackageDto>("/packages", request),
   })

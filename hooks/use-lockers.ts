@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import type { LockerDto } from "@dtos/master-data"
 
-import { queryKeys, readJson } from "./api"
+import { get, queryKeys } from "./api"
 
 /**
  * Every locker with its current status, occupied ones included.
@@ -15,5 +15,5 @@ import { queryKeys, readJson } from "./api"
 export const useLockers = () =>
   useQuery({
     queryKey: queryKeys.lockers,
-    queryFn: () => readJson<LockerDto[]>("/api/lockers"),
+    queryFn: () => get<LockerDto[]>("/lockers"),
   })

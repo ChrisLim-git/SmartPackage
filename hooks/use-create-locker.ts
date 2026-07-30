@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import type { LockerDto } from "@dtos/master-data"
 
-import { postJson, queryKeys } from "./api"
+import { post, queryKeys } from "./api"
 
 export type NewLocker = {
   stationId: string
@@ -23,8 +23,7 @@ export const useCreateLocker = () => {
   const queries = useQueryClient()
 
   return useMutation({
-    mutationFn: (details: NewLocker) =>
-      postJson<LockerDto>("/api/lockers", details),
+    mutationFn: (details: NewLocker) => post<LockerDto>("/lockers", details),
     onSuccess: () => queries.invalidateQueries({ queryKey: queryKeys.lockers }),
   })
 }

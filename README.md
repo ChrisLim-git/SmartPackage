@@ -81,7 +81,8 @@ src/
 app/                   route handlers + pages — the controllers
 components/            React components — the presentation layer
 components/ui/  lib/   shadcn primitives. Leaves, not a layer.
-hooks/                 every TanStack Query call, one hook per file
+hooks/                 every TanStack Query call, one hook per file;
+                       hooks/api.ts is the axios client and the cache keys
 utils/                 test doubles and fixtures — in-memory repositories,
                        stub generators, the test-database pool
 ```
@@ -204,6 +205,8 @@ A role-aware nav sits in the header on every page, so what each role can reach i
 Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
 
 Route handlers are the HTTP adapter only: guard, validate, delegate to a domain service, map errors to status codes. No SQL and no business rules in `route.ts`. Reads go through route handlers rather than Server Actions, which are queued and would serialise a parallel fan-out.
+
+On the client side, every query and mutation is a hook in `hooks/`, one per file, and they all talk through the axios instance in `hooks/api.ts`. Its response interceptor is where `{ error: { code, message } }` becomes a plain `Error`, so a form renders the sentence the error taxonomy already chose instead of inventing one from a status code — and a component never sees an HTTP client at all.
 
 ## Authorship
 

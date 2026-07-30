@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 
 import type { CollectedPackageDto } from "@dtos/package"
 
-import { postJson } from "./api"
+import { post } from "./api"
 
 /**
  * A recipient collecting a parcel, with six digits and no session.
@@ -16,5 +16,5 @@ import { postJson } from "./api"
 export const useCollectPackage = () =>
   useMutation({
     mutationFn: (pickupCode: string) =>
-      postJson<CollectedPackageDto>("/api/pickups", { pickupCode }),
+      post<CollectedPackageDto>("/pickups", { pickupCode }),
   })

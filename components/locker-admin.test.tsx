@@ -6,8 +6,6 @@ import { render, screen, within } from "@testing-library/react"
 
 import type { LockerDto, LockerSizeDto, StationDto } from "@dtos/master-data"
 
-import { LockerAdmin } from "./locker-admin"
-
 const CENTRAL = "11111111-1111-7111-8111-111111111111"
 const HARBOUR = "22222222-2222-7222-8222-222222222222"
 
@@ -38,8 +36,39 @@ const LOCKERS: LockerDto[] = [
   locker("B1", HARBOUR, SIZES[1], "occupied"),
 ]
 
-const respond = (body: unknown) =>
-  Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response)
+const BODIES: Record<string, unknown> = {
+  "/stations": STATIONS,
+  "/locker-sizes": SIZES,
+  "/lockers": LOCKERS,
+}
+
+/**
+ * Stubbed at `hooks/api`, which is the seam that belongs to this test.
+ *
+ * Not at `fetch`: the client is axios, so a `fetch` stub in jsdom intercepts
+ * nothing — axios reaches for `XMLHttpRequest` — and a test asserting a rendered
+ * count has no business knowing which transport is underneath. One level down,
+ * the hooks and the interceptor still run for real.
+ */
+jest.unstable_mockModule("@/hooks/api", () => ({
+  get: async (path: string) => {
+    if (!(path in BODIES)) throw new Error(`unexpected request: ${path}`)
+
+    return BODIES[path]
+  },
+  post: async () => {
+    throw new Error("this test creates nothing")
+  },
+  queryKeys: {
+    stations: ["stations"],
+    lockerSizes: ["locker-sizes"],
+    lockers: ["lockers"],
+  },
+}))
+
+// After the mock is registered: an ESM graph resolves on import, so a static
+// import of the component would bind the real client first.
+const { LockerAdmin } = await import("./locker-admin")
 
 const renderAdmin = () => {
   // No retries: a failing query would otherwise be retried three times before
@@ -74,18 +103,6 @@ const capacityCells = async (station: string) => {
  * which makes this the only place it can be checked.
  */
 describe("the locker capacity table", () => {
-  beforeEach(() => {
-    globalThis.fetch = jest.fn((input: unknown) => {
-      const url = String(input)
-
-      if (url === "/api/stations") return respond(STATIONS)
-      if (url === "/api/locker-sizes") return respond(SIZES)
-      if (url === "/api/lockers") return respond(LOCKERS)
-
-      return Promise.reject(new Error(`unexpected fetch: ${url}`))
-    }) as unknown as typeof fetch
-  })
-
   it("counts free against total, per station and per size", async () => {
     renderAdmin()
 

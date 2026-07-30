@@ -85,9 +85,9 @@ describe("the convention against a real Postgres", () => {
           id uuid PRIMARY KEY DEFAULT uuidv7(),
           ${table.endsWith("widget") ? "name text NOT NULL," : ""}
           created_at timestamptz NOT NULL DEFAULT now(),
-          created_by text,
+          created_by uuid,
           updated_at timestamptz NOT NULL DEFAULT now(),
-          updated_by text,
+          updated_by uuid,
           deleted_at timestamptz
         )
       `)

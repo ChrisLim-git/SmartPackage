@@ -34,6 +34,20 @@ describe("email and password auth", () => {
     expect(rows.rows).toHaveLength(1)
   })
 
+  it("gives the account a v7 uuid, like every other table", async () => {
+    const email = emailFor("uuid")
+
+    await signUp(email)
+
+    const rows = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [
+      email,
+    ])
+    // The version nibble is the first character of the third group. Left to
+    // its own devices BetterAuth issues a 32-character base62 string, and the
+    // `uuid` audit columns pointing at this id would reject every one.
+    expect(rows.rows[0].id.split("-")[2].charAt(0)).toBe("7")
+  })
+
   it("stores the password on the account row, never on the user", async () => {
     const email = emailFor("hash")
     await signUp(email)

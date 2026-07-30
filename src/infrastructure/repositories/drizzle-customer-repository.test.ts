@@ -16,6 +16,23 @@ const ids = new UuidV7Generator()
 
 const repository = () => new DrizzleCustomerRepository(db, ids)
 
+/**
+ * Inserts an account and returns the id the database gave it.
+ *
+ * The id is never supplied: `user.id` belongs to BetterAuth's configuration,
+ * and a test that hard-codes its shape stops noticing when that shape changes.
+ */
+const insertUser = async (email: string): Promise<string> => {
+  const { rows } = await pool.query(
+    `INSERT INTO "user" (name, email, email_verified, created_at, updated_at)
+     VALUES ('Ari Agent', $1, false, now(), now())
+     RETURNING id`,
+    [email]
+  )
+
+  return rows[0].id
+}
+
 describe("DrizzleCustomerRepository", () => {
   beforeEach(async () => {
     await pool.query("DELETE FROM customer")
@@ -108,19 +125,14 @@ describe("DrizzleCustomerRepository", () => {
     expect(row.rows[0].updated_by).toBeNull()
   })
 
-  it("stamps a real acting user, whose id is not a uuid", async () => {
+  it("stamps a real acting user into the actor columns", async () => {
     const customers = repository()
-    // Better Auth issues a 32-character alphanumeric id, not a uuid, so an
-    // actor column typed `uuid` rejects every real user. Every other test here
-    // passes SYSTEM_ACTOR, which is null and lands in any column type — this
-    // is the one that goes near the real thing.
-    const agentId = "IR9EwxsrIdxsic0whVkBJFXFbsLzsU7T"
-    await pool.query(
-      `INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
-       VALUES ($1, 'Ari Agent', 'ari-agent@example.com', false, now(), now())
-       ON CONFLICT (id) DO NOTHING`,
-      [agentId]
-    )
+    // The id is read back from `user`, never invented here. Whether the actor
+    // columns can hold a real user id is the entire point of this test, so
+    // writing the shape into it by hand would only test the hand-written
+    // shape. Every other test passes SYSTEM_ACTOR, which is null and fits any
+    // column type — that is how a mismatch stayed invisible for a whole phase.
+    const agentId = await insertUser("ari-agent@example.com")
 
     const created = await customers.findOrCreateByEmail(
       { email: "rowan@example.com", name: "Rowan Recipient" },
@@ -143,12 +155,7 @@ describe("DrizzleCustomerRepository", () => {
     )
     // A real account: `user_id` is a foreign key, so an invented id is
     // rejected — which is the constraint doing its job.
-    const accountId = `user-${ids.next()}`
-    await pool.query(
-      `INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
-       VALUES ($1, 'Rowan Recipient', 'rowan-account@example.com', false, now(), now())`,
-      [accountId]
-    )
+    const accountId = await insertUser("rowan-account@example.com")
 
     const linked = await customers.save(created.linkTo(accountId), SYSTEM_ACTOR)
 

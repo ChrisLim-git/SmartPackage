@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { uuidv7 } from "uuidv7"
 
 import { db } from "../db/client"
 import * as schema from "../db/schema"
@@ -53,6 +54,29 @@ export const createAuth = (database: typeof db) =>
           // of the sign-up payload and anyone can register as an admin.
           input: false,
         },
+      },
+    },
+
+    advanced: {
+      database: {
+        // BetterAuth's own default is a 32-character base62 string, which is
+        // why `user.id` began life as `text` and why a `uuid` audit column
+        // rejected every real actor. A v7 here makes the auth tables obey the
+        // same convention as the domain ones: uuid columns, time-ordered.
+        //
+        // `"uuid"` is the option the CLI reads to emit `uuid` columns, but on
+        // Postgres it defers to `gen_random_uuid()` — v4, and unordered. The
+        // function is how the value becomes a v7; the `gen_random_uuid()`
+        // default left in the generated schema is a fallback that never fires,
+        // exactly like the `uuidv7()` default on `primaryId()`.
+        //
+        // Regenerating this schema means setting `generateId: "uuid"` for the
+        // duration of the run, or the CLI emits `text` columns again.
+        //
+        // The package function, not `UuidV7Generator`: that wrapper imports the
+        // domain through a tsconfig path alias, and the CLI's loader does not
+        // read them.
+        generateId: () => uuidv7(),
       },
     },
 

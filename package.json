@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"src/(domain|dtos|application|presentation)\"",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"src/(domain|dtos|application)|/(components|hooks)/\"",
     "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPatterns \"(src/infrastructure|app/api)\"",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "db:generate": "drizzle-kit generate",

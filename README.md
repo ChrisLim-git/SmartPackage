@@ -71,26 +71,27 @@ src/
 ├── dtos/              wire shapes — imports domain; the domain never imports back
 ├── application/       imports domain + dtos
 │   └── services/      use cases — orchestration, not rules
-├── infrastructure/    imports domain + application
-│   ├── database/      drizzle client, schema, migrations, repositories
-│   ├── external/      better-auth
-│   ├── generators/    uuid v7, pickup codes
-│   ├── security/      pickup code hashing
-│   ├── time/          system clock
-│   └── container.ts   composition root — the only file that knows every concrete type
-└── presentation/      imports application, domain and dtos
-    ├── views/         React components
-    └── hooks/
+└── infrastructure/    imports domain + application
+    ├── database/      drizzle client, schema, migrations, repositories
+    ├── external/      better-auth
+    ├── generators/    uuid v7, pickup codes
+    ├── security/      pickup code hashing
+    ├── time/          system clock
+    └── container.ts   composition root — the only file that knows every concrete type
 
-app/                   route handlers + pages — the controllers. Next owns this path.
-components/ hooks/ lib/  shadcn primitives. Leaves, not a layer.
+app/                   route handlers + pages — the controllers
+components/            React components — the presentation layer
+components/ui/  lib/   shadcn primitives. Leaves, not a layer.
+hooks/                 React hooks
 ```
+
+There is no `src/presentation`: Next _is_ the frontend, so the presentation layer is Next's own folders rather than a parallel tree inside `src/`. The layer boundary is still enforced — `components/ui` is classified as the design system and `components/` as presentation, so a shadcn primitive cannot reach the application while a screen beside it can.
 
 The direction is not conveyed by the folder names, so it is enforced instead: `pnpm lint` fails the build on a wrong-direction import, and each rule was verified by writing the violation and watching it be rejected.
 
 `app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. Handlers stay thin — guard, validate, delegate, map — and every concrete implementation they use is wired in `container.ts`.
 
-Aliases: `@domain/*`, `@dtos/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
+Aliases: `@domain/*`, `@dtos/*`, `@application/*`, `@infrastructure/*`, and `@/*` for the repo root. Not `@types/*` — TypeScript reserves that prefix for DefinitelyTyped packages and rejects the import with `TS6137`.
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 

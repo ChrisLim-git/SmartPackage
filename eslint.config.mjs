@@ -71,20 +71,22 @@ const eslintConfig = defineConfig([
         { type: "dtos", pattern: "src/dtos" },
         { type: "application", pattern: "src/application" },
         { type: "infrastructure", pattern: "src/infrastructure" },
-        // `views`, not `components`. The plugin classifies a file by its
-        // nearest matching ancestor *folder name*, so a nested
-        // `src/presentation/components` was matched by the bare `components`
-        // pattern below and every presentation component was silently held to
-        // the design system's rules — which forbid depending on `application`.
-        // Reordering does not help; the name has to be unambiguous.
-        { type: "presentation", pattern: "src/presentation" },
         // app/ is the composition root: it wires concrete implementations into
         // use cases, so it is the one place allowed to see everything.
         { type: "app", pattern: "app" },
-        // shadcn primitives. Design-system leaves, not a layer.
-        { type: "ui", pattern: "components" },
-        { type: "ui", pattern: "hooks" },
+        // `components/ui` must come before `components`. The plugin classifies
+        // a file by its *nearest* matching ancestor folder, so a shadcn
+        // primitive resolves to `ui` while a component beside it resolves to
+        // `presentation` — which is the whole point of the split: a design
+        // system leaf must not reach the application, and an app component
+        // must. Verified by probe in both directions, because a
+        // misclassification here is silent.
+        { type: "ui", pattern: "components/ui" },
         { type: "ui", pattern: "lib" },
+        // Next is the frontend, so the presentation layer *is* Next's own
+        // folders rather than a parallel tree inside src/.
+        { type: "presentation", pattern: "components" },
+        { type: "presentation", pattern: "hooks" },
       ],
     },
     rules: {

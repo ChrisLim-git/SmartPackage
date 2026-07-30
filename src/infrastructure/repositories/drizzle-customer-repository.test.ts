@@ -108,6 +108,33 @@ describe("DrizzleCustomerRepository", () => {
     expect(row.rows[0].updated_by).toBeNull()
   })
 
+  it("stamps a real acting user, whose id is not a uuid", async () => {
+    const customers = repository()
+    // Better Auth issues a 32-character alphanumeric id, not a uuid, so an
+    // actor column typed `uuid` rejects every real user. Every other test here
+    // passes SYSTEM_ACTOR, which is null and lands in any column type — this
+    // is the one that goes near the real thing.
+    const agentId = "IR9EwxsrIdxsic0whVkBJFXFbsLzsU7T"
+    await pool.query(
+      `INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
+       VALUES ($1, 'Ari Agent', 'ari-agent@example.com', false, now(), now())
+       ON CONFLICT (id) DO NOTHING`,
+      [agentId]
+    )
+
+    const created = await customers.findOrCreateByEmail(
+      { email: "rowan@example.com", name: "Rowan Recipient" },
+      { actingUserId: agentId }
+    )
+
+    const row = await pool.query(
+      "SELECT created_by, updated_by FROM customer WHERE id = $1",
+      [created.id]
+    )
+    expect(row.rows[0].created_by).toBe(agentId)
+    expect(row.rows[0].updated_by).toBe(agentId)
+  })
+
   it("keeps the same row when an account is linked later", async () => {
     const customers = repository()
     const created = await customers.findOrCreateByEmail(

@@ -7,3 +7,4 @@
 // discards the edit. Domain tables belong in their own files alongside this one
 // and are re-exported here.
 export * from "./auth-schema"
+export * from "./customer"

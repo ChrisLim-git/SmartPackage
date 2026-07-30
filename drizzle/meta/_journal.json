@@ -8,6 +8,13 @@
       "when": 1785389531415,
       "tag": "0000_melted_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785390907465,
+      "tag": "0001_crazy_silverclaw",
+      "breakpoints": true
     }
   ]
 }

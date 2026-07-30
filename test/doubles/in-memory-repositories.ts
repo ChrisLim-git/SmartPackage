@@ -204,7 +204,7 @@ export class InMemoryCustomerRepository implements CustomerRepository {
     return this.customers.find((customer) => customer.email === folded) ?? null
   }
 
-  async save(customer: Customer): Promise<Customer> {
+  async save(customer: Customer, _actor: AuditContext): Promise<Customer> {
     const existing = this.customers.findIndex((held) => held.id === customer.id)
 
     if (existing === -1) {
@@ -216,11 +216,14 @@ export class InMemoryCustomerRepository implements CustomerRepository {
     return customer
   }
 
-  async findOrCreateByEmail(details: {
-    email: string
-    name: string
-    phone?: string | null
-  }): Promise<Customer> {
+  async findOrCreateByEmail(
+    details: {
+      email: string
+      name: string
+      phone?: string | null
+    },
+    actor: AuditContext
+  ): Promise<Customer> {
     const existing = await this.findByEmail(details.email)
     if (existing !== null) {
       return existing
@@ -238,7 +241,7 @@ export class InMemoryCustomerRepository implements CustomerRepository {
       throw new Error(`cannot create a customer: ${created.error.message}`)
     }
 
-    return this.save(created.value)
+    return this.save(created.value, actor)
   }
 }
 

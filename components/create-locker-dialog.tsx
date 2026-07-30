@@ -45,10 +45,13 @@ type FormValues = z.infer<typeof schema>
 export const CreateLockerDialog = ({
   stations,
   sizes,
+  disabled = false,
   onCreate,
 }: {
   stations: StationDto[]
   sizes: LockerSizeDto[]
+  /** Set when the stations or the sizes are missing — the two dropdowns would have nothing in them. */
+  disabled?: boolean
   onCreate: (details: FormValues) => Promise<unknown>
 }) => {
   const [open, setOpen] = useState(false)
@@ -84,7 +87,7 @@ export const CreateLockerDialog = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add locker</Button>
+        <Button disabled={disabled}>Add locker</Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} noValidate>

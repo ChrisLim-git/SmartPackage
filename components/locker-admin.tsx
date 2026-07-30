@@ -1,5 +1,6 @@
 "use client"
 
+import { RiAlertLine } from "@remixicon/react"
 import { useState } from "react"
 
 import type { LockerDto, LockerSizeDto, StationDto } from "@dtos/master-data"
@@ -68,6 +69,18 @@ const toCapacity = (
     })
   )
 
+/** "lockers", "stations and lockers", "stations, locker sizes and lockers". */
+const listOf = (items: string[]): string => {
+  const sentenceCase = (text: string) =>
+    text.charAt(0).toUpperCase() + text.slice(1)
+
+  if (items.length === 1) return sentenceCase(items[0])
+
+  return sentenceCase(
+    `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+  )
+}
+
 const LoadingRows = ({ columns }: { columns: number }) => (
   <>
     {[0, 1, 2].map((row) => (
@@ -93,6 +106,24 @@ export const LockerAdmin = () => {
   const createdStation = useCreateStation()
 
   const isLoading = stations.isLoading || sizes.isLoading || lockers.isLoading
+
+  /**
+   * Named individually rather than collapsed into "something went wrong".
+   *
+   * Each of these produces a different broken screen — no columns, no rows, no
+   * station names — and an operator who is told which one failed knows whether
+   * what they are looking at can be trusted.
+   */
+  const failures = [
+    stations.isError && { label: "stations", retry: stations.refetch },
+    sizes.isError && { label: "locker sizes", retry: sizes.refetch },
+    lockers.isError && { label: "lockers", retry: lockers.refetch },
+  ].filter((failure) => failure !== false)
+
+  // The dialog's two dropdowns come from these. Opened without them it is a
+  // form that cannot be completed and does not explain itself.
+  const canAddLocker =
+    (stations.data ?? []).length > 0 && (sizes.data ?? []).length > 0
   const capacity =
     stations.data && lockers.data && sizes.data
       ? toCapacity(stations.data, lockers.data, sizes.data)
@@ -107,6 +138,33 @@ export const LockerAdmin = () => {
 
   return (
     <div className="flex flex-col gap-8">
+      {failures.length > 0 && (
+        // Above the tables, not below them: a message under a screen someone
+        // has already read and believed has arrived too late.
+        <div
+          role="alert"
+          className="flex items-start gap-3 border border-border bg-muted p-4"
+        >
+          <RiAlertLine className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <div className="flex flex-col items-start gap-1">
+            <p className="font-medium">
+              {listOf(failures.map((failure) => failure.label))} could not be
+              loaded.
+            </p>
+            <p className="text-[0.8125rem] text-muted-foreground">
+              What is shown below is incomplete.
+            </p>
+            <Button
+              variant="link"
+              className="h-auto p-0"
+              onClick={() => failures.forEach((failure) => failure.retry())}
+            >
+              Try again
+            </Button>
+          </div>
+        </div>
+      )}
+
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-lg">Capacity</h2>
@@ -202,6 +260,7 @@ export const LockerAdmin = () => {
             <CreateLockerDialog
               stations={stations.data ?? []}
               sizes={sizes.data ?? []}
+              disabled={!canAddLocker}
               onCreate={(details) => created.mutateAsync(details)}
             />
           </div>
@@ -220,6 +279,14 @@ export const LockerAdmin = () => {
             <TableBody>
               {isLoading ? (
                 <LoadingRows columns={4} />
+              ) : lockers.isError ? (
+                // Not the empty state. "No lockers here" is a statement about
+                // the estate, and a failed request knows nothing about it.
+                <TableRow>
+                  <TableCell colSpan={4} className="text-muted-foreground">
+                    The locker list could not be loaded.
+                  </TableCell>
+                </TableRow>
               ) : visible.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-muted-foreground">
@@ -251,15 +318,6 @@ export const LockerAdmin = () => {
           </Table>
         </div>
       </section>
-
-      {lockers.isError && (
-        <p role="alert" className="text-sm text-destructive">
-          The locker list could not be loaded.{" "}
-          <Button variant="link" onClick={() => lockers.refetch()}>
-            Try again
-          </Button>
-        </p>
-      )}
     </div>
   )
 }

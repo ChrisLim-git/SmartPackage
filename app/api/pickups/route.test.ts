@@ -108,7 +108,44 @@ describe("POST /api/pickups", () => {
       lockerLabel,
       packageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       retrievedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      // The fee arrives with the band that produced it, and the rate is a
+      // fixed two-decimal string for the same reason the total is.
+      bands: [{ fromDay: 1, toDay: 1, days: 1, ratePerDay: "2.00" }],
     })
+  })
+
+  it("explains the fee in bands that multiply out to the fee", async () => {
+    // The property a customer checks by hand. A stay that crossed a tier
+    // boundary is charged at two rates, so one stated rate would give a figure
+    // the total contradicts — which is what this endpoint used to send.
+    const { pickupCode } = await storeOne()
+
+    // Backdated so the stay spans the first boundary: five days at 2.00 and two
+    // at 4.00 is 18.00, and never seven days at 2.00.
+    await pool.query(
+      `UPDATE package SET stored_at = now() - interval '6 days 1 hour'
+       WHERE status = 'stored'`
+    )
+    currentSession.value = null
+
+    const collected = (await (await POST(request({ pickupCode }))).json()) as {
+      fee: string
+      chargeableDays: number
+      bands: { days: number; ratePerDay: string }[]
+    }
+
+    expect(collected.chargeableDays).toBe(7)
+    expect(collected.fee).toBe("18.00")
+    expect(collected.bands).toEqual([
+      { fromDay: 1, toDay: 5, days: 5, ratePerDay: "2.00" },
+      { fromDay: 6, toDay: 7, days: 2, ratePerDay: "4.00" },
+    ])
+
+    const summed = collected.bands.reduce(
+      (total, band) => total + Number(band.ratePerDay) * band.days,
+      0
+    )
+    expect(summed.toFixed(2)).toBe(collected.fee)
   })
 
   it("answers a code no parcel is waiting under with 404", async () => {

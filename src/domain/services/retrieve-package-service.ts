@@ -13,7 +13,7 @@ import { err, isErr, ok, type Result } from "../shared/result"
 import type { Money } from "../utils/money"
 import { PickupCode } from "../utils/pickup-code"
 import { StorageDuration } from "../utils/storage-duration"
-import type { StorageFeeService } from "./storage-fee-service"
+import type { ChargedBand, StorageFeeService } from "./storage-fee-service"
 
 export type RetrievePackageCommand = {
   /**
@@ -36,15 +36,16 @@ export type RetrievedPackage = {
   readonly storedAt: Date
   readonly chargeableDays: number
   /**
-   * The two numbers a customer needs to read the total back.
+   * What the customer needs to read the total back.
    *
    * A charge nobody can reconstruct is where trust breaks at a locker wall, so
-   * the daily rate and the day the rate first rises travel with the fee rather
-   * than being re-derived by whoever renders it — a second derivation is a second
-   * chance to disagree with the invoice.
+   * the bands travel with the fee rather than being re-derived by whoever
+   * renders it — a second derivation is a second chance to disagree with the
+   * invoice. A single rate could not do this job: a stay that crossed a tier
+   * boundary was charged at more than one, and naming only the first states an
+   * amount the total contradicts.
    */
-  readonly baseRate: Money
-  readonly firstTierEndsOnDay: number | null
+  readonly bands: readonly ChargedBand[]
 }
 
 export type RetrievePackageDependencies = {
@@ -116,9 +117,9 @@ export class RetrievePackageService {
           return err(duration.error)
         }
 
-        const fee = fees.calculate(duration.value, config)
+        const priced = fees.calculate(duration.value, config)
 
-        const collected = parcel.retrieve(retrievedAt, fee)
+        const collected = parcel.retrieve(retrievedAt, priced.total)
         if (isErr(collected)) {
           return err(collected.error)
         }
@@ -135,15 +136,14 @@ export class RetrievePackageService {
         return ok({
           packageId: collected.value.id,
           lockerLabel: locker.label,
-          fee,
+          fee: priced.total,
           retrievedAt,
           storedAt: parcel.storedAt,
           // Returned rather than left to whoever displays it: the fee is
-          // explained to the customer in days, and two implementations of "how
-          // many days is that" would eventually disagree with the invoice.
+          // explained to the customer in days and rates, and a second
+          // implementation of either would eventually disagree with the invoice.
           chargeableDays: duration.value.chargeableDays,
-          baseRate: config.baseRate,
-          firstTierEndsOnDay: config.tiers[0].toDay,
+          bands: priced.bands,
         })
       }
     )

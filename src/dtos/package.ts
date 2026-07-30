@@ -20,14 +20,31 @@ export type StoredPackageDto = {
   storedAt: string
 }
 
+/**
+ * One band of the stay, at the rate that band charges.
+ *
+ * A rate and not a subtotal, matching the domain: the total is rounded once,
+ * across every band, so per-band amounts would not add up to it.
+ */
+export type ChargedBandDto = {
+  fromDay: number
+  toDay: number
+  days: number
+  ratePerDay: string
+}
+
 export type CollectedPackageDto = {
   packageId: string
   lockerLabel: string
   fee: string
   chargeableDays: number
-  /** The rate and the boundary, so the total on screen can be read back. */
-  dailyRate: string
-  firstTierEndsOnDay: number | null
+  /**
+   * Every band the stay was charged at, so the total on screen can be read
+   * back. Not a single `dailyRate`: a stay that crossed a tier boundary was
+   * charged at more than one, and one number describing several states an
+   * amount the total contradicts.
+   */
+  bands: ChargedBandDto[]
   retrievedAt: string
 }
 
@@ -46,7 +63,11 @@ export const toCollectedPackageDto = (
   lockerLabel: collected.lockerLabel,
   fee: collected.fee.toDecimalString(),
   chargeableDays: collected.chargeableDays,
-  dailyRate: collected.baseRate.toDecimalString(),
-  firstTierEndsOnDay: collected.firstTierEndsOnDay,
+  bands: collected.bands.map((band) => ({
+    fromDay: band.fromDay,
+    toDay: band.toDay,
+    days: band.days,
+    ratePerDay: band.ratePerDay.toDecimalString(),
+  })),
   retrievedAt: collected.retrievedAt.toISOString(),
 })

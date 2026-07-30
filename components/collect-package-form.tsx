@@ -46,6 +46,17 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 /**
+ * "Day 3" for a single day, "Days 1–5" for a run.
+ *
+ * An en dash, not a hyphen: this is a range of numbers, and the two are
+ * different characters for exactly this.
+ */
+const describeDays = (band: { fromDay: number; toDay: number }) =>
+  band.fromDay === band.toDay
+    ? `Day ${band.fromDay}`
+    : `Days ${band.fromDay}–${band.toDay}`
+
+/**
  * The one screen that needs no account, and it asks for one thing.
  *
  * Six digits and nothing else: no sign-in, no station, no locker number. The
@@ -93,17 +104,24 @@ export const CollectPackageForm = () => {
             ${collected.fee}
           </p>
           {/* An unexplained charge at a locker is where trust breaks, so the
-              number is followed by the arithmetic behind it: the days, the rate
-              they were charged at, and where the rate starts rising. */}
+              number is followed by the arithmetic behind it — every band the
+              stay was charged at, not one rate standing in for several. A stay
+              that crossed a boundary paid two rates, and stating only the first
+              gives a figure the total contradicts. */}
+          <dl className="flex flex-col gap-1 pt-2 text-[0.8125rem] text-muted-foreground">
+            {collected.bands.map((band) => (
+              <div key={band.fromDay} className="flex justify-between gap-4">
+                <dt>{describeDays(band)}</dt>
+                <dd className="font-mono tabular-nums">
+                  {band.ratePerDay === "0.00"
+                    ? "free"
+                    : `$${band.ratePerDay} a day`}
+                </dd>
+              </div>
+            ))}
+          </dl>
           <p className="pt-2 text-[0.8125rem] text-muted-foreground">
-            {collected.chargeableDays === 1
-              ? `One day at $${collected.dailyRate} a day.`
-              : `${collected.chargeableDays} days at $${collected.dailyRate} a day`}
-            {collected.chargeableDays > 1 &&
-              collected.firstTierEndsOnDay !== null &&
-              `, rising after day ${collected.firstTierEndsOnDay}`}
-            {collected.chargeableDays > 1 && "."} A part day counts as a whole
-            one.
+            A part day counts as a whole one.
           </p>
         </div>
 

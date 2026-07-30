@@ -53,6 +53,8 @@ const request = (url: string, body?: unknown) =>
 describe("/api/lockers", () => {
   let stationId: string
 
+  const locker = (label: string) => ({ stationId, sizeCode: "S", label })
+
   beforeAll(async () => {
     await db
       .insert(lockerSize)
@@ -82,10 +84,25 @@ describe("/api/lockers", () => {
       expect((await GET(request("http://test/api/lockers"))).status).toBe(401)
     })
 
-    it("lets any signed-in person read the list", async () => {
+    it("answers a signed-in reader with the wire shape, not the entity", async () => {
+      signedInAs("admin")
+      await POST(request("http://test/api/lockers", locker("R1")))
       signedInAs("agent")
 
-      expect((await GET(request("http://test/api/lockers"))).status).toBe(200)
+      const response = await GET(request("http://test/api/lockers"))
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      // The contract, not the count: a `Locker` serialised directly would put
+      // a value object's private shape on the wire, one rename from breaking
+      // every client. Any role may read — an agent needs to see availability.
+      expect(body).toContainEqual(
+        expect.objectContaining({
+          label: "R1",
+          status: "available",
+          size: expect.objectContaining({ code: "S", rank: 1 }),
+        })
+      )
     })
 
     it("answers 400, not 500, for a stationId that is not a uuid", async () => {
@@ -103,8 +120,6 @@ describe("/api/lockers", () => {
   })
 
   describe("POST", () => {
-    const locker = (label: string) => ({ stationId, sizeCode: "S", label })
-
     it("answers 401 unauthenticated and 403 for the wrong role", async () => {
       signedOut()
       const anonymous = await POST(

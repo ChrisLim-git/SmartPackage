@@ -13,7 +13,8 @@ export type DomainErrorCode = DomainError["code"]
 
 export type NoSuitableLockerAvailable = {
   readonly code: "NoSuitableLockerAvailable"
-  readonly stationId: string
+  /** Null when the failure came from the selection policy, which is never told which station it is looking at. */
+  readonly stationId: string | null
   readonly message: string
 }
 
@@ -75,11 +76,14 @@ export type DomainError =
 
 /** Nothing free at the station fits the package. Normal, not exceptional. */
 export const noSuitableLockerAvailable = (
-  stationId: string
+  stationId: string | null = null
 ): NoSuitableLockerAvailable => ({
   code: "NoSuitableLockerAvailable",
   stationId,
-  message: `No available locker at station ${stationId} is large enough for this package.`,
+  message:
+    stationId === null
+      ? "No available locker is large enough for this package."
+      : `No available locker at station ${stationId} is large enough for this package.`,
 })
 
 /** An occupy against a locker that already holds something — expected under contention. */

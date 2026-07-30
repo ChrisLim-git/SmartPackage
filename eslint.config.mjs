@@ -66,6 +66,12 @@ const eslintConfig = defineConfig([
         { type: "domain", pattern: "src/domain" },
         { type: "application", pattern: "src/application" },
         { type: "infrastructure", pattern: "src/infrastructure" },
+        // `views`, not `components`. The plugin classifies a file by its
+        // nearest matching ancestor *folder name*, so a nested
+        // `src/presentation/components` was matched by the bare `components`
+        // pattern below and every presentation component was silently held to
+        // the design system's rules — which forbid depending on `application`.
+        // Reordering does not help; the name has to be unambiguous.
         { type: "presentation", pattern: "src/presentation" },
         // app/ is the composition root: it wires concrete implementations into
         // use cases, so it is the one place allowed to see everything.

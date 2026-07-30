@@ -4,7 +4,8 @@ import { Geist, JetBrains_Mono, Merriweather } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import { SessionBar } from "@presentation/components/session-bar"
+import { QueryProvider } from "@presentation/views/query-provider"
+import { SessionBar } from "@presentation/views/session-bar"
 
 export const metadata: Metadata = {
   title: "Smart Package Locker",
@@ -45,8 +46,10 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <SessionBar />
-          {children}
+          <QueryProvider>
+            <SessionBar />
+            {children}
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

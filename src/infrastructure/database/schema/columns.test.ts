@@ -143,10 +143,23 @@ describe("the convention against a real Postgres", () => {
       .where(eq(widget.id, stored.id))
       .returning()
 
-    expect(changed.createdAt.getTime()).toBe(stored.createdAt.getTime())
-    expect(changed.updatedAt.getTime()).toBeGreaterThan(
-      stored.updatedAt.getTime()
+    // Compared in Postgres, not in JavaScript. `timestamptz` keeps microseconds
+    // and a `Date` truncates to milliseconds, so an insert and an update a few
+    // hundred microseconds apart read back as the same instant — which made this
+    // assertion pass or fail depending on how busy the machine was.
+    const { rows } = await pool.query<{
+      moved: boolean
+      created_held: boolean
+    }>(
+      `SELECT updated_at > created_at AS moved,
+              created_at = $2::timestamptz AS created_held
+         FROM audit_probe_widget
+        WHERE id = $1`,
+      [stored.id, stored.createdAt.toISOString()]
     )
+
+    expect(rows[0].moved).toBe(true)
+    expect(changed.createdAt.getTime()).toBe(stored.createdAt.getTime())
   })
 
   it("hides a soft-deleted row from reads but leaves it in the table", async () => {

@@ -50,8 +50,14 @@ export const auditColumns = {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
-    // Stamped by the ORM on every update, so no repository has to remember.
-    .$onUpdate(() => new Date()),
+    // Stamped on every update, so no repository has to remember — and stamped by
+    // **Postgres**, not by `new Date()`. The default above is the database clock
+    // at microsecond precision; a JavaScript `Date` is the application clock
+    // truncated to milliseconds, and mixing the two makes `updated_at` land up to
+    // a millisecond *before* `created_at` on a fast insert-then-update. That is a
+    // row whose audit trail says it was modified before it existed, and it
+    // surfaced as a test that failed roughly one run in four.
+    .$onUpdate(() => sql`now()`),
   updatedBy: uuid("updated_by"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }

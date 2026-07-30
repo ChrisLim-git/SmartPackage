@@ -1,6 +1,10 @@
 import { z } from "zod"
 
-import { errorResponse, toHttpResponse } from "@dtos/http-error"
+import {
+  errorResponse,
+  toHttpResponse,
+  toServerFailure,
+} from "@dtos/http-error"
 import { toCollectedPackageDto } from "@dtos/package"
 import { isErr } from "@domain/shared/result"
 import { collectPackage } from "@infrastructure/container"
@@ -41,14 +45,21 @@ export async function POST(request: Request) {
     return errorResponse("MalformedInput", command.error.issues[0].message, 400)
   }
 
-  const collected = await collectPackage.execute({
-    ...command.data,
-    // No acting user, and that is the honest value: nobody signed in to open
-    // this locker. The parcel records who stored it, never who took it.
-    audit: { actingUserId: null },
-  })
+  // Logged in full and answered with nothing: a thrown error here describes the
+  // inside of the system, and on this route more than any other — it is the one
+  // an unauthenticated stranger can reach.
+  try {
+    const collected = await collectPackage.execute({
+      ...command.data,
+      // No acting user, and that is the honest value: nobody signed in to open
+      // this locker. The parcel records who stored it, never who took it.
+      audit: { actingUserId: null },
+    })
 
-  if (isErr(collected)) return toHttpResponse(collected.error)
+    if (isErr(collected)) return toHttpResponse(collected.error)
 
-  return Response.json(toCollectedPackageDto(collected.value))
+    return Response.json(toCollectedPackageDto(collected.value))
+  } catch (thrown) {
+    return toServerFailure(thrown)
+  }
 }

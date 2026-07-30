@@ -194,7 +194,10 @@ export class LockerRepository extends BaseRepository<typeof locker> {
     await this.query
       .update(locker)
       .set({ status: "available", updatedBy: actor.actingUserId })
-      .where(eq(locker.id, lockerId))
+      // A soft-deleted locker is gone as far as every read is concerned, so a
+      // write must not reach it either — otherwise a decommissioned locker comes
+      // back advertised as available.
+      .where(and(eq(locker.id, lockerId), this.visible))
   }
 
   /**

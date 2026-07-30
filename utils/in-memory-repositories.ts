@@ -171,14 +171,6 @@ export class InMemoryLockerRepository implements LockerRepository {
 export class InMemoryPackageRepository implements PackageRepository {
   constructor(private parcels: Package[] = []) {}
 
-  async findStoredByLockerId(lockerId: string): Promise<Package | null> {
-    return (
-      this.parcels.find(
-        (parcel) => parcel.lockerId === lockerId && parcel.status === "stored"
-      ) ?? null
-    )
-  }
-
   async findStoredByCodeHash(pickupCodeHash: string): Promise<Package | null> {
     return (
       this.parcels.find(

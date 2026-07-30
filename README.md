@@ -2,7 +2,7 @@
 
 A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-digit pickup code; the recipient types that code — nothing else, no account — sees the fee and a QR code, and scans it at the kiosk to open the door.
 
-> **Status: in progress.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication and the master-data admin surface are in place; the store and retrieve flows come next. See [Progress](#progress).
+> **Status: in progress.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface and both package flows — store and collect, over HTTP and through the UI — are in place. What remains is the concurrency contention proof and the submission pass. See [Progress](#progress).
 
 ## Running it
 
@@ -155,11 +155,13 @@ State machines are deliberately tiny, and illegal transitions return errors rath
 
 The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" are expected _outcomes_, not exceptional ones — under contention a failed claim is normal. A thrown error means a bug or an infrastructure failure. One mapper turns the error taxonomy into status codes, so the domain knows nothing about HTTP even though the handler that calls it is an HTTP file.
 
-**Retrieval failures are deliberately indistinguishable in the response.** Unknown locker, wrong code, empty locker and already-retrieved all return the same shape and status, because distinguishing them would tell an attacker which locker labels are real and which hold packages. The internal error types stay distinct for logging and tests; only the response is flattened.
+**Retrieval failures are deliberately indistinguishable in the response.** An unknown code, a wrong code and a code whose parcel has already gone all return the same shape and status, because distinguishing them would tell an attacker which locker labels are real and which hold packages. The internal error types stay distinct for logging and tests; only the response is flattened.
 
 ### Data
 
 - **Money never touches a float.** Integer minor units in the domain, `numeric(12,2)` in Postgres, never Drizzle's `mode: 'number'`. Rounded half-up once on the final total, never per tier.
+- **A pickup code is six digits with no attempt cap**, which is brute-forceable at about a million tries — and a code identifies a parcel on its own, so a caller dialling codes is dialling for any parcel in the network, not one locker's. The mitigation is a per-locker attempt cap, specified and deliberately parked as stretch. Naming it here is the honest version; leaving it out would read as not having noticed.
+- **The fit rule is written twice**: `OrdinalFitService` in the domain, and `s.rank >= $1` inside the atomic claim's SQL. Atomicity is why — a claim that consulted the domain would be a read and then a write, which is the race the claim exists to close. They are kept honest by the in-memory repository delegating to the real service, so a disagreement surfaces as a failing domain test; an integration test asserting the SQL order matches the policy is still owed.
 - **Pickup codes are stored hashed** and compared by hash, in constant time. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker. The hash is HMAC-SHA256 under a server-side pepper rather than a bare digest — six digits is a million candidates, which a bare digest column gives up in seconds. The pepper is a constant in `pickup-code-hasher.ts` rather than configuration — this is a demonstration system, and a variable a reviewer has to set is a clone that stores packages nobody can collect. A deployment would read it from a secret store, because a pepper in the repository is a pepper everyone with the repository has.
 - **UUIDv7 primary keys**, generated through `IdGenerator` so entities are valid before they reach a repository, with `DEFAULT uuidv7()` as a safety net. Postgres 18 provides `uuidv7()` natively — no extension.
 - **Five audit columns on every domain table**: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`. Deliberately no `deleted_by` — a soft delete is a write, so `updated_by` already records the actor. Reads filter `deleted_at IS NULL` in the shared `notDeleted` helper, so no caller ever writes that filter.
@@ -242,7 +244,9 @@ git log --oneline pre-squash-full-history
 | Domain core — value objects, entities, services                        | done    |
 | Authentication, roles, guards, login UI                                | done    |
 | Master data — schema, migrations, seed, repositories, admin API and UI | done    |
-| Store, retrieve and fees; concurrency hardening; submission docs       | to come |
+| Store and collect — flows, persistence, transaction, API, both screens | done    |
+| Atomic locker claim and pickup-code uniqueness                         | done    |
+| Concurrency contention proof; submission docs                          | to come |
 
 Known gaps are tracked here as they arise rather than discovered by a reader:
 

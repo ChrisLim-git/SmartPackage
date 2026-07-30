@@ -35,6 +35,16 @@ export type RetrievedPackage = {
   readonly retrievedAt: Date
   readonly storedAt: Date
   readonly chargeableDays: number
+  /**
+   * The two numbers a customer needs to read the total back.
+   *
+   * A charge nobody can reconstruct is where trust breaks at a locker wall, so
+   * the daily rate and the day the rate first rises travel with the fee rather
+   * than being re-derived by whoever renders it — a second derivation is a second
+   * chance to disagree with the invoice.
+   */
+  readonly baseRate: Money
+  readonly firstTierEndsOnDay: number | null
 }
 
 export type RetrievePackageDependencies = {
@@ -132,6 +142,8 @@ export class RetrievePackageService {
           // explained to the customer in days, and two implementations of "how
           // many days is that" would eventually disagree with the invoice.
           chargeableDays: duration.value.chargeableDays,
+          baseRate: config.baseRate,
+          firstTierEndsOnDay: config.tiers[0].toDay,
         })
       }
     )

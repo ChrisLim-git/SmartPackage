@@ -1,7 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { RiAlertLine, RiLockUnlockLine } from "@remixicon/react"
+import { RiLockUnlockLine } from "@remixicon/react"
 import { QRCodeSVG } from "qrcode.react"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
@@ -10,6 +10,7 @@ import { z } from "zod"
 import type { CollectedPackageDto } from "@dtos/package"
 
 import { FIELD_SUBMIT } from "@/components/field-surface"
+import { FormAlert } from "@/components/form-alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import {
@@ -84,13 +85,17 @@ export const CollectPackageForm = () => {
             ${collected.fee}
           </p>
           {/* An unexplained charge at a locker is where trust breaks, so the
-              number is followed by the arithmetic behind it. */}
+              number is followed by the arithmetic behind it: the days, the rate
+              they were charged at, and where the rate starts rising. */}
           <p className="pt-2 text-[0.8125rem] text-muted-foreground">
             {collected.chargeableDays === 1
-              ? "One day of storage."
-              : `${collected.chargeableDays} days of storage.`}{" "}
-            The daily rate rises in bands the longer a package stays, and a part
-            day counts as a whole one.
+              ? `One day at $${collected.dailyRate} a day.`
+              : `${collected.chargeableDays} days at $${collected.dailyRate} a day`}
+            {collected.chargeableDays > 1 &&
+              collected.firstTierEndsOnDay !== null &&
+              `, rising after day ${collected.firstTierEndsOnDay}`}
+            {collected.chargeableDays > 1 && "."} A part day counts as a whole
+            one.
           </p>
         </div>
 
@@ -115,20 +120,12 @@ export const CollectPackageForm = () => {
       noValidate
     >
       {collect.isError && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 border border-border bg-muted p-4"
-        >
-          <RiAlertLine className="mt-0.5 size-5 shrink-0" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <p className="font-medium">{collect.error.message}</p>
-            {/* Helpful without leaking: it does not say what was wrong with the
-                code, because that is exactly what an attacker is asking. */}
-            <p className="text-[0.8125rem] text-muted-foreground">
-              Check the six digits and try again.
-            </p>
-          </div>
-        </div>
+        // Helpful without leaking: the advice does not say what was wrong with
+        // the code, because that is exactly what an attacker is asking.
+        <FormAlert
+          message={collect.error.message}
+          advice="Check the six digits and try again."
+        />
       )}
 
       <Field data-invalid={errors.pickupCode !== undefined}>

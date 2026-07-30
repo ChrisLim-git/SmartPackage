@@ -1,6 +1,10 @@
 import { z } from "zod"
 
-import { errorResponse, toHttpResponse } from "@dtos/http-error"
+import {
+  errorResponse,
+  toHttpResponse,
+  toServerFailure,
+} from "@dtos/http-error"
 import { toStoredPackageDto } from "@dtos/package"
 import { isErr } from "@domain/shared/result"
 import { guards, storePackage } from "@infrastructure/container"
@@ -46,20 +50,28 @@ export async function POST(request: Request) {
     return errorResponse("MalformedInput", command.error.issues[0].message, 400)
   }
 
-  const stored = await storePackage.execute({
-    ...command.data,
-    recipient: {
-      ...command.data.recipient,
-      phone: command.data.recipient.phone ?? null,
-    },
-    // The agent is answerable for the parcel, which is a domain fact rather than
-    // an audit stamp — `stored_by` on the row.
-    audit: { actingUserId: session.value.user.id },
-  })
+  // A `Result` is an expected outcome and maps to a status; a throw is a bug or
+  // an infrastructure failure, and the flow has several — the pickup-code space
+  // exhausted, a locker that vanished under a stored parcel. Without this the
+  // detail reaches the client as Next's own error page instead of the log.
+  try {
+    const stored = await storePackage.execute({
+      ...command.data,
+      recipient: {
+        ...command.data.recipient,
+        phone: command.data.recipient.phone ?? null,
+      },
+      // The agent is answerable for the parcel, which is a domain fact rather
+      // than an audit stamp — `stored_by` on the row.
+      audit: { actingUserId: session.value.user.id },
+    })
 
-  if (isErr(stored)) return toHttpResponse(stored.error)
+    if (isErr(stored)) return toHttpResponse(stored.error)
 
-  // 201: a parcel now exists that did not before. The code is in this response
-  // and nowhere else afterwards.
-  return Response.json(toStoredPackageDto(stored.value), { status: 201 })
+    // 201: a parcel now exists that did not before. The code is in this response
+    // and nowhere else afterwards.
+    return Response.json(toStoredPackageDto(stored.value), { status: 201 })
+  } catch (thrown) {
+    return toServerFailure(thrown)
+  }
 }

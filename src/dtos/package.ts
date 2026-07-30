@@ -25,6 +25,9 @@ export type CollectedPackageDto = {
   lockerLabel: string
   fee: string
   chargeableDays: number
+  /** The rate and the boundary, so the total on screen can be read back. */
+  dailyRate: string
+  firstTierEndsOnDay: number | null
   retrievedAt: string
   /**
    * What the kiosk scanner reads to open the door.
@@ -53,6 +56,8 @@ export const toCollectedPackageDto = (
   lockerLabel: collected.lockerLabel,
   fee: collected.fee.toDecimalString(),
   chargeableDays: collected.chargeableDays,
+  dailyRate: collected.baseRate.toDecimalString(),
+  firstTierEndsOnDay: collected.firstTierEndsOnDay,
   retrievedAt: collected.retrievedAt.toISOString(),
   unlockUri: `smartpackage://unlock?locker=${encodeURIComponent(
     collected.lockerLabel

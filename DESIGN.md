@@ -125,6 +125,10 @@ Every interactive component ships **default, hover, focus, active, disabled, loa
 - Every animation has a `prefers-reduced-motion: reduce` alternative — crossfade or instant.
 - One place motion earns real weight: the agent's **store → success** transition. The locker label and code arriving needs to feel like a result, not a re-render.
 
+### The one hand-authored colour
+
+`bg-white` on the QR container in `collect-package-form.tsx`. A scanner reads dark modules on a light field, and a QR rendered on a dark surface fails on plenty of supermarket hardware — so this one panel stays light in both themes. It is a functional constraint of the scanner, not a colour choice, which is why it is written down here rather than tokenised.
+
 ## Bans, enforced at review
 
 Card grids as default layout · gradient text · decorative glassmorphism · side-stripe accent borders · ghost cards (border + wide shadow) · radii ≥24px on containers · decorative CSS grid backgrounds · uppercase tracked eyebrows · display fonts in labels or data · modals as first thought · colour-only state encoding · spinners where skeletons belong.

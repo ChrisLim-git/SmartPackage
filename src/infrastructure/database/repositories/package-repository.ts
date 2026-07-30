@@ -78,28 +78,6 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
   }
 
   /**
-   * The parcel currently in a locker, if there is one.
-   *
-   * Scoped to `stored`, which is what makes a replayed code indistinguishable
-   * from a wrong one: a locker that has held ten parcels over a month holds one
-   * now, and a collection asks about that one. Without the predicate a collected
-   * parcel comes back and its code opens the door again.
-   */
-  async findStoredByLockerId(lockerId: string): Promise<Package | null> {
-    const [row] = await this.selectPackages()
-      .where(
-        and(
-          eq(packageTable.lockerId, lockerId),
-          eq(packageTable.status, "stored"),
-          this.visible
-        )
-      )
-      .limit(1)
-
-    return row === undefined ? null : this.toEntity(row)
-  }
-
-  /**
    * The parcel a code opens, found by the hash of that code.
    *
    * Scoped to `stored` and to the same predicate as the partial unique index, so
@@ -134,7 +112,10 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
     const [existing] = await this.query
       .select({ id: packageTable.id })
       .from(packageTable)
-      .where(eq(packageTable.id, parcel.id))
+      // `visible` here too, not only on the reads: without it a soft-deleted row
+      // sharing this id would send a store down the update branch and quietly
+      // resurrect it.
+      .where(and(eq(packageTable.id, parcel.id), this.visible))
       .limit(1)
 
     if (existing !== undefined) {

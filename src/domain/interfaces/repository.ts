@@ -89,15 +89,6 @@ export type LockerRepository = Repository<Locker> & {
 
 export type PackageRepository = {
   /**
-   * The parcel currently in a locker, if there is one.
-   *
-   * Scoped to `stored` rather than to the locker's whole history: a locker that
-   * has held ten packages over a month has one now, and a collection asks about
-   * that one.
-   */
-  findStoredByLockerId(lockerId: string): Promise<Package | null>
-
-  /**
    * The parcel a pickup code opens.
    *
    * The recipient types six digits and nothing else — no station, no locker

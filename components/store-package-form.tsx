@@ -1,7 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { RiAlertLine, RiArchiveLine, RiFileCopyLine } from "@remixicon/react"
+import { RiArchiveLine, RiFileCopyLine } from "@remixicon/react"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
@@ -15,6 +15,7 @@ import {
   FIELD_SELECT,
   FIELD_SUBMIT,
 } from "@/components/field-surface"
+import { FormAlert } from "@/components/form-alert"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -181,21 +182,10 @@ export const StorePackageForm = ({
       noValidate
     >
       {store.isError && (
-        // Calm, not a red toast: a full station is an ordinary answer to a
-        // reasonable request, and the agent's next move is a different station
-        // or a smaller package.
-        <div
-          role="alert"
-          className="flex items-start gap-3 border border-border bg-muted p-4"
-        >
-          <RiAlertLine className="mt-0.5 size-5 shrink-0" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <p className="font-medium">{store.error.message}</p>
-            <p className="text-[0.8125rem] text-muted-foreground">
-              Your details are still here. Try another size or another station.
-            </p>
-          </div>
-        </div>
+        <FormAlert
+          message={store.error.message}
+          advice="Your details are still here. Try another size or another station."
+        />
       )}
 
       {stations.length > 1 && (

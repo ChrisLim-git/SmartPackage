@@ -117,7 +117,10 @@ export function SessionBar() {
                 // cannot be conveyed by weight alone.
                 aria-current={here ? "page" : undefined}
                 className={cn(
-                  "py-1 transition-colors duration-150",
+                  // 44px, not the 24px a bare `py-1` gives: this nav renders on
+                  // the agent and collect surfaces, where DESIGN.md's tap-target
+                  // floor applies to everything a thumb can reach.
+                  "inline-flex min-h-11 items-center transition-colors duration-150",
                   here
                     ? "font-medium underline decoration-2 underline-offset-4"
                     : "text-muted-foreground hover:text-foreground"

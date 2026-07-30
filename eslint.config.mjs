@@ -1,22 +1,55 @@
-import { resolve } from "node:path";
+import { resolve } from "node:path"
 
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
-import boundaries from "eslint-plugin-boundaries";
+import { defineConfig, globalIgnores } from "eslint/config"
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
+import boundaries from "eslint-plugin-boundaries"
 
 /**
- * Dependencies point inward. This file is the enforcement — not a convention
- * document. `eslint-plugin-boundaries` v7 collapsed `element-types` and
- * `no-private` into a single `boundaries/dependencies` rule taking
- * `default` + `policies`; any pre-v7 config found online is wrong.
+ * Dependencies point inward, and this file is the enforcement. See the README's
+ * architecture section for what the layers mean.
  */
+
+/** Anything that would tie an inner layer to a framework or a driver. */
+const FRAMEWORK_PACKAGES = [
+  "next",
+  "next/*",
+  "react",
+  "react-dom",
+  "pg",
+  "drizzle-orm",
+  "drizzle-orm/*",
+]
+
+/**
+ * The domain is stricter still: no auth library, no id library, and no Node
+ * built-ins — `node:crypto` is the back door that makes a domain entity
+ * generate its own ids and stop being testable.
+ */
+const DOMAIN_FORBIDDEN_PACKAGES = [
+  ...FRAMEWORK_PACKAGES,
+  "better-auth",
+  "better-auth/*",
+  "uuidv7",
+  "node:*",
+  "crypto",
+]
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
 
   {
-    files: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    // components/, hooks/ and lib/ are listed as sources too, not just as import
+    // targets — otherwise a shadcn component could import the database and
+    // nothing would report it.
+    files: [
+      "src/**/*.{ts,tsx}",
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+    ],
     plugins: { boundaries },
     settings: {
       "boundaries/root-path": resolve(import.meta.dirname),
@@ -25,34 +58,31 @@ const eslintConfig = defineConfig([
       "import/resolver": {
         typescript: { alwaysTryTypes: true, project: "./tsconfig.json" },
       },
-      // Bare directory patterns, not `src/domain/**/*`. v7 matches a path
-      // *prefix* by default, so "src/domain" classifies everything beneath it.
-      // `src/domain/**/*` looks more precise and is worse: it leaves files
-      // sitting directly in src/domain/ unclassified, which makes every policy
-      // below skip them **silently**. Verified by deliberately violating the
-      // rule — see the README's architecture section.
+      // Bare directory patterns, not "src/domain/**/*". v7 matches a path
+      // prefix, so "src/domain" classifies everything beneath it, while
+      // "src/domain/**/*" leaves files sitting directly in the folder
+      // unclassified — and every policy below then skips them silently.
       "boundaries/elements": [
         { type: "domain", pattern: "src/domain" },
         { type: "application", pattern: "src/application" },
         { type: "infrastructure", pattern: "src/infrastructure" },
         { type: "presentation", pattern: "src/presentation" },
-        // app/ is the composition root: it wires concrete implementations
-        // into use cases, so it is the one place allowed to see everything.
+        // app/ is the composition root: it wires concrete implementations into
+        // use cases, so it is the one place allowed to see everything.
         { type: "app", pattern: "app" },
         // shadcn primitives. Design-system leaves, not a layer.
         { type: "ui", pattern: "components" },
         { type: "ui", pattern: "hooks" },
         { type: "ui", pattern: "lib" },
       ],
-      // A domain test may legitimately reach for an in-memory fake.
-      "boundaries/ignore": ["**/*.test.ts", "**/*.test.tsx"],
     },
     rules: {
       "boundaries/dependencies": [
         "error",
         {
           default: "disallow",
-          message: "{{from.element.types}} must not depend on {{to.element.types}}",
+          message:
+            "{{from.element.types}} must not depend on {{to.element.types}}",
           policies: [
             {
               from: { element: { type: "domain" } },
@@ -106,15 +136,10 @@ const eslintConfig = defineConfig([
           ],
         },
       ],
-
     },
   },
 
   {
-    // Keeps the application layer framework-free. `boundaries/dependencies`
-    // governs layer-to-layer imports; this governs third-party ones.
-    // Deliberately the built-in rule rather than `boundaries/external`, which
-    // v7 deprecates. The domain gets a stricter list further down.
     files: ["src/application/**/*.ts"],
     rules: {
       "no-restricted-imports": [
@@ -122,17 +147,9 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: [
-                "next",
-                "next/*",
-                "react",
-                "react-dom",
-                "pg",
-                "drizzle-orm",
-                "drizzle-orm/*",
-              ],
+              group: FRAMEWORK_PACKAGES,
               message:
-                "The domain and application layers are framework-free. Depend on a port and implement it in infrastructure.",
+                "The application layer is framework-free. Depend on a port and implement it in infrastructure.",
             },
           ],
         },
@@ -141,10 +158,6 @@ const eslintConfig = defineConfig([
   },
 
   {
-    // The other half of the domain rule: no ambient non-determinism. Boundary
-    // rules cover imports; these cover globals. Time, ids and codes must arrive
-    // through the Clock / IdGenerator / PickupCodeGenerator ports so every
-    // domain test is instant and repeatable.
     files: ["src/domain/**/*.ts"],
     rules: {
       "no-restricted-imports": [
@@ -152,36 +165,31 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: [
-                "next",
-                "next/*",
-                "react",
-                "react-dom",
-                "pg",
-                "drizzle-orm",
-                "drizzle-orm/*",
-                "better-auth",
-                "better-auth/*",
-                "uuidv7",
-              ],
+              group: DOMAIN_FORBIDDEN_PACKAGES,
               message:
                 "The domain imports nothing but itself. Declare a port; implement it in infrastructure.",
             },
           ],
         },
       ],
+      // Boundary rules cover imports; these cover ambient globals. Time, ids and
+      // codes must arrive through the Clock / IdGenerator / PickupCodeGenerator
+      // ports, which is what makes every domain test instant and repeatable.
       "no-restricted-syntax": [
         "error",
         {
           selector: "NewExpression[callee.name='Date']",
-          message: "domain must take time from the Clock port, not `new Date()`.",
+          message:
+            "domain must take time from the Clock port, not `new Date()`.",
         },
         {
           selector: "MemberExpression[object.name='Date'][property.name='now']",
-          message: "domain must take time from the Clock port, not `Date.now()`.",
+          message:
+            "domain must take time from the Clock port, not `Date.now()`.",
         },
         {
-          selector: "MemberExpression[object.name='Math'][property.name='random']",
+          selector:
+            "MemberExpression[object.name='Math'][property.name='random']",
           message:
             "domain must take randomness from a port (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
         },
@@ -191,7 +199,8 @@ const eslintConfig = defineConfig([
             "domain must take ids from the IdGenerator port, not the crypto global.",
         },
         {
-          selector: "MemberExpression[object.name='process'][property.name='env']",
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
           message: "domain must not read configuration; pass it in.",
         },
       ],
@@ -206,6 +215,6 @@ const eslintConfig = defineConfig([
     "coverage/**",
     "drizzle/**",
   ]),
-]);
+])
 
-export default eslintConfig;
+export default eslintConfig

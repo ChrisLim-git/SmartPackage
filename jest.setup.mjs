@@ -7,5 +7,5 @@
 // rejects `await import()` of it. The matcher *types* still reach the tests via
 // the "types" array in tsconfig.json.
 if (typeof window !== "undefined") {
-  await import("@testing-library/jest-dom");
+  await import("@testing-library/jest-dom")
 }

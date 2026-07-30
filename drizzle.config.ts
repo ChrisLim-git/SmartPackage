@@ -1,5 +1,5 @@
-import { loadEnvConfig } from "@next/env";
-import { defineConfig } from "drizzle-kit";
+import { loadEnvConfig } from "@next/env"
+import { defineConfig } from "drizzle-kit"
 
 // drizzle-kit does not read .env.local on its own. Using @next/env rather than
 // dotenv keeps the loading order identical to the one `next dev` uses.
@@ -8,7 +8,7 @@ import { defineConfig } from "drizzle-kit";
 // same package. drizzle-kit bundles this file to CJS with esbuild, where named
 // imports of a CJS module work and `.default` is undefined; Jest loads its setup
 // as real ESM, where the opposite holds.
-loadEnvConfig(process.cwd());
+loadEnvConfig(process.cwd())
 
 export default defineConfig({
   dialect: "postgresql",
@@ -19,4 +19,4 @@ export default defineConfig({
   casing: "snake_case",
   strict: true,
   verbose: true,
-});
+})

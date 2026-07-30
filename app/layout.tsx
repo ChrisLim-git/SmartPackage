@@ -3,7 +3,7 @@ import { Geist, JetBrains_Mono, Merriweather } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "Smart Package Locker",
@@ -15,14 +15,16 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-const merriweatherHeading = Merriweather({subsets:['latin'],variable:'--font-heading'});
-
-const fontSans = Geist({
+// Named for the CSS variable each one feeds, so the slot is obvious at the call
+// site below. Note the preset makes mono the *body* font — see DESIGN.md.
+const headingFont = Merriweather({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-heading",
 })
 
-const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'})
+const sansFont = Geist({ subsets: ["latin"], variable: "--font-sans" })
+
+const monoFont = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export default function RootLayout({
   children,
@@ -33,7 +35,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontSans.variable, "font-mono", jetbrainsMono.variable, merriweatherHeading.variable)}
+      className={cn(
+        "antialiased",
+        sansFont.variable,
+        monoFont.variable,
+        headingFont.variable
+      )}
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>

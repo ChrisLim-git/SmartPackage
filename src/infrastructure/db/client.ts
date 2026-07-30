@@ -1,7 +1,7 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres"
+import { Pool } from "pg"
 
-import * as schema from "./schema";
+import * as schema from "./schema"
 
 /**
  * One pool for the process. Next.js re-evaluates modules on hot reload, so
@@ -13,7 +13,7 @@ import * as schema from "./schema";
  * `@vercel/postgres` is HTTP, so it cannot hold a row lock across statements —
  * which the atomic locker claim needs.
  */
-const globalForDb = globalThis as unknown as { __pool?: Pool };
+const globalForDb = globalThis as unknown as { __pool?: Pool }
 
 export const pool =
   globalForDb.__pool ??
@@ -22,17 +22,17 @@ export const pool =
     max: 20,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
-  });
+  })
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.__pool = pool;
+  globalForDb.__pool = pool
 }
 
 // `casing` must match drizzle.config.ts, or runtime queries name columns the
 // migrations never created.
-export const db = drizzle({ client: pool, schema, casing: "snake_case" });
+export const db = drizzle({ client: pool, schema, casing: "snake_case" })
 
-export type Db = typeof db;
+export type Db = typeof db
 
 /** For repositories that must be able to join a caller's transaction. */
-export type DbOrTx = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
+export type DbOrTx = Db | Parameters<Parameters<Db["transaction"]>[0]>[0]

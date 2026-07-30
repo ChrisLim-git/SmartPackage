@@ -17,6 +17,9 @@
 const config = {
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
+  // Set once here rather than per script, so `test:unit` and `test:integration`
+  // also exit 0 while their layers are still empty.
+  passWithNoTests: true,
   globalSetup: "<rootDir>/jest.global-setup.mjs",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.mjs"],
 
@@ -55,6 +58,6 @@ const config = {
     "/components/ui/",
   ],
   collectCoverageFrom: ["src/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
-};
+}
 
-export default config;
+export default config

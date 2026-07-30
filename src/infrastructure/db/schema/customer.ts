@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm"
 import { pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { user } from "./auth-schema"
@@ -29,15 +28,17 @@ export const customer = pgTable(
     ...auditColumns,
   },
   (table) => [
-    // The index is on the raw column, not `lower(email)`, because `Customer`
-    // folds the address before it can reach a repository — there is one form
-    // in the database by construction.
+    // On the raw column, not `lower(email)`, because `Customer` folds the
+    // address before it can reach a repository — there is one form in the
+    // database by construction. Its job is to stop `findOrCreateByEmail`
+    // racing two rows for one person into existence.
     //
-    // Partial, so a soft-deleted row does not block the same address being
-    // used again. Its job is to stop `findOrCreateByEmail` racing two rows for
-    // one person into existence.
-    uniqueIndex("customer_email_unique")
-      .on(table.email)
-      .where(sql`${table.deletedAt} IS NULL`),
+    // Deliberately *not* partial on `deleted_at`. Nothing soft-deletes a
+    // customer, so the predicate would guard a state that cannot arise — and
+    // it is not free: Postgres will not infer a partial index in `ON
+    // CONFLICT`, so every upsert has to repeat the predicate or fail outright.
+    // If customers ever do become soft-deletable, this index is the thing to
+    // revisit, because two rows could then hold the same address.
+    uniqueIndex("customer_email_unique").on(table.email),
   ]
 )

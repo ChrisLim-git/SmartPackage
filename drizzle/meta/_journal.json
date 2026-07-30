@@ -15,6 +15,13 @@
       "when": 1785390907465,
       "tag": "0001_crazy_silverclaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785391118398,
+      "tag": "0002_lying_bromley",
+      "breakpoints": true
     }
   ]
 }

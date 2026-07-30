@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 
 import type { AuditContext } from "@application/interfaces/audit-context"
 import type { CustomerRepository } from "@application/interfaces/customer-repository"
@@ -128,11 +128,6 @@ export class DrizzleCustomerRepository implements CustomerRepository {
       })
       .onConflictDoUpdate({
         target: customer.email,
-        // The predicate has to be repeated here. The index is partial, and
-        // Postgres will not infer a partial index from the column alone —
-        // without this it raises "there is no unique or exclusion constraint
-        // matching the ON CONFLICT specification".
-        targetWhere: sql`${customer.deletedAt} is null`,
         // Nothing about the existing person is overwritten: the agent typed an
         // address to find someone, not to rename them.
         set: { updatedBy: actor.actingUserId },

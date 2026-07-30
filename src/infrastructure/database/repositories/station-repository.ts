@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm"
 
-import type { StationRepository } from "@domain/interfaces/station-repository"
+import type { StationRepository as StationRepositoryContract } from "@domain/interfaces/station-repository"
 import { Station } from "@domain/entities/station"
 import { isErr } from "@domain/shared/result"
 
@@ -27,7 +27,7 @@ const toEntity = (row: StationRow): Station => {
   return entity.value
 }
 
-export class PostgresStationRepository implements StationRepository {
+export class StationRepository implements StationRepositoryContract {
   constructor(private readonly db: DbOrTx) {}
 
   async findById(id: string): Promise<Station | null> {

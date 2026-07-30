@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm"
 
-import type { PricingRepository } from "@domain/interfaces/pricing-repository"
+import type { PricingRepository as PricingRepositoryContract } from "@domain/interfaces/pricing-repository"
 import { isErr } from "@domain/shared/result"
 import { FeeTier } from "@domain/utils/fee-tier"
 import { Money } from "@domain/utils/money"
@@ -18,7 +18,7 @@ import { notDeleted } from "./soft-delete"
  * `parseFloat`. Concentrating it in one method means the money rule holds by
  * construction rather than by everyone remembering it.
  */
-export class PostgresPricingRepository implements PricingRepository {
+export class PricingRepository implements PricingRepositoryContract {
   constructor(private readonly db: DbOrTx) {}
 
   async currentConfig(): Promise<PricingConfig> {

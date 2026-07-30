@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm"
 
 import type { AuditContext } from "@domain/interfaces/audit-context"
-import type { LockerRepository } from "@domain/interfaces/locker-repository"
+import type { LockerRepository as LockerRepositoryContract } from "@domain/interfaces/locker-repository"
 import { Locker } from "@domain/entities/locker"
 import { isErr } from "@domain/shared/result"
 import { LockerSize, type PackageSize } from "@domain/utils/size"
@@ -52,7 +52,7 @@ const toEntity = (row: { locker: LockerRow; locker_size: SizeRow }): Locker => {
   return entity.value
 }
 
-export class PostgresLockerRepository implements LockerRepository {
+export class LockerRepository implements LockerRepositoryContract {
   constructor(private readonly db: DbOrTx) {}
 
   /** Every read needs the size, so every read is the same join. */

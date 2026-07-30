@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 
 import type { AuditContext } from "@domain/interfaces/audit-context"
-import type { CustomerRepository } from "@domain/interfaces/customer-repository"
+import type { CustomerRepository as CustomerRepositoryContract } from "@domain/interfaces/customer-repository"
 import { Customer } from "@domain/entities/customer"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { isErr } from "@domain/shared/result"
@@ -31,7 +31,7 @@ const toEntity = (row: CustomerRow): Customer => {
   return entity.value
 }
 
-export class PostgresCustomerRepository implements CustomerRepository {
+export class CustomerRepository implements CustomerRepositoryContract {
   constructor(
     private readonly db: DbOrTx,
     private readonly ids: IdGenerator

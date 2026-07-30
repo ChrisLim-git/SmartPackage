@@ -1,6 +1,6 @@
 import { asc } from "drizzle-orm"
 
-import type { LockerSizeRepository } from "@domain/interfaces/locker-size-repository"
+import type { LockerSizeRepository as LockerSizeRepositoryContract } from "@domain/interfaces/locker-size-repository"
 import { isErr } from "@domain/shared/result"
 import { LockerSize } from "@domain/utils/size"
 
@@ -8,7 +8,7 @@ import type { Db, DbOrTx } from "../client"
 import { lockerSize } from "../schema/locker-size"
 import { notDeleted } from "./soft-delete"
 
-export class PostgresLockerSizeRepository implements LockerSizeRepository {
+export class LockerSizeRepository implements LockerSizeRepositoryContract {
   constructor(private readonly db: DbOrTx) {}
 
   async findAll(): Promise<LockerSize[]> {

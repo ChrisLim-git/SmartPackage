@@ -1,6 +1,6 @@
 import type { PickupCodeGenerator } from "@domain/interfaces/pickup-code-generator"
 import { isErr } from "@domain/shared/result"
-import { PickupCode } from "@domain/value-objects/pickup-code"
+import { PickupCode } from "@domain/utils/pickup-code"
 
 /**
  * Hands out a fixed queue of pickup codes, in order.

@@ -16,8 +16,8 @@ import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { OrdinalFitPolicy } from "@domain/services/ordinal-fit-policy"
 import { SmallestFitFirstPolicy } from "@domain/services/smallest-fit-first-policy"
 import { isErr } from "@domain/shared/result"
-import type { PricingConfig } from "@domain/value-objects/pricing-config"
-import type { LockerSize, PackageSize } from "@domain/value-objects/size"
+import type { PricingConfig } from "@domain/utils/pricing-config"
+import type { LockerSize, PackageSize } from "@domain/utils/size"
 
 /**
  * In-memory repositories, for use-case tests that have no business touching a

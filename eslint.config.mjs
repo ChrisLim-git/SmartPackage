@@ -59,20 +59,20 @@ const eslintConfig = defineConfig([
         typescript: { alwaysTryTypes: true, project: "./tsconfig.json" },
       },
       // Bare directory patterns, not "src/domain/**/*". v7 matches a path
-      // prefix, so "src/1_domain" classifies everything beneath it, while
+      // prefix, so "src/domain" classifies everything beneath it, while
       // "src/domain/**/*" leaves files sitting directly in the folder
       // unclassified — and every policy below then skips them silently.
       "boundaries/elements": [
-        { type: "domain", pattern: "src/1_domain" },
-        { type: "application", pattern: "src/2_application" },
-        { type: "infrastructure", pattern: "src/3_infrastructure" },
+        { type: "domain", pattern: "src/domain" },
+        { type: "application", pattern: "src/application" },
+        { type: "infrastructure", pattern: "src/infrastructure" },
         // `views`, not `components`. The plugin classifies a file by its
         // nearest matching ancestor *folder name*, so a nested
         // `src/presentation/components` was matched by the bare `components`
         // pattern below and every presentation component was silently held to
         // the design system's rules — which forbid depending on `application`.
         // Reordering does not help; the name has to be unambiguous.
-        { type: "presentation", pattern: "src/4_presentation" },
+        { type: "presentation", pattern: "src/presentation" },
         // app/ is the composition root: it wires concrete implementations into
         // use cases, so it is the one place allowed to see everything.
         { type: "app", pattern: "app" },
@@ -159,7 +159,7 @@ const eslintConfig = defineConfig([
   },
 
   {
-    files: ["src/2_application/**/*.ts"],
+    files: ["src/application/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -177,7 +177,7 @@ const eslintConfig = defineConfig([
   },
 
   {
-    files: ["src/1_domain/**/*.ts"],
+    files: ["src/domain/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -236,7 +236,7 @@ const eslintConfig = defineConfig([
     // zero-argument call still reaches for the machine clock and is still
     // rejected here, as are Date.now, Math.random, crypto and process.env,
     // which this override does not touch.
-    files: ["src/1_domain/**/*.test.ts"],
+    files: ["src/domain/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",

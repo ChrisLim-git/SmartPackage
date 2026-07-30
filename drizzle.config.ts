@@ -12,7 +12,7 @@ loadEnvConfig(process.cwd())
 
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./src/3_infrastructure/database/schema/index.ts",
+  schema: "./src/infrastructure/database/schema/index.ts",
   out: "./drizzle",
   dbCredentials: { url: process.env.DATABASE_URL! },
   // Must agree with the `casing` passed to drizzle() in client.ts.

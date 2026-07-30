@@ -1,3 +1,4 @@
+import { InstallLockerService } from "@domain/services/install-locker-service"
 import { RetrievePackageService } from "@domain/services/retrieve-package-service"
 import { StorePackageService } from "@domain/services/store-package-service"
 import { TieredDailyRateFeeService } from "@domain/services/tiered-daily-rate-fee-service"
@@ -45,6 +46,16 @@ export const packages = new PackageRepository(db)
  * is why the services below are given the unit of work and not these.
  */
 export const uow = new UnitOfWork(db, ids)
+
+/**
+ * No unit of work: installing a locker is a single insert. Handing this one a
+ * transaction would suggest there is a second write to keep it company.
+ */
+export const installLocker = new InstallLockerService({
+  lockers,
+  lockerSizes,
+  stations,
+})
 
 export const storePackage = new StorePackageService({
   stations,

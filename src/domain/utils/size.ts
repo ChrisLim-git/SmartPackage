@@ -71,6 +71,36 @@ export abstract class Size {
   }
 }
 
+/**
+ * A code an operator typed, against the ladder master data actually holds.
+ *
+ * Written once and shared, because every flow that takes a size code has the
+ * same two things to say about an unknown one: it is the caller's typo rather
+ * than a state of the estate, and the answer should name the codes that do
+ * exist. Two copies of that would drift into two different sentences, and
+ * eventually into two different rules about what counts as a size.
+ */
+export const findSizeByCode = <TSize extends Size>(
+  ladder: readonly TSize[],
+  code: string,
+  field: string
+): Result<TSize, MalformedInput> => {
+  const match = ladder.find((size) => size.code === code)
+
+  if (match === undefined) {
+    return err(
+      malformedInput(
+        field,
+        `"${code}" is not a known size — the sizes are ${ladder
+          .map((size) => size.code)
+          .join(", ")}`
+      )
+    )
+  }
+
+  return ok(match)
+}
+
 /** What a locker can hold. */
 export class LockerSize extends Size {
   protected readonly kind = "locker" as const

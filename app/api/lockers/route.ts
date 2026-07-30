@@ -1,10 +1,10 @@
 import { z } from "zod"
 
-import { errorResponse } from "@dtos/http-error"
+import { errorResponse, toHttpResponse } from "@dtos/http-error"
 import { toLockerDto } from "@dtos/master-data"
 import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
-import { guards, lockerSizes, lockers } from "@infrastructure/container"
+import { guards, installLocker, lockers } from "@infrastructure/container"
 
 /**
  * A station id reaches this handler as text from a query string, and every
@@ -60,35 +60,15 @@ export async function POST(request: Request) {
     return badRequest(details.error.issues[0].message)
   }
 
-  // A size code is caller input exactly as a station id is, and the repository
-  // can only answer "no such size" by throwing. Left unchecked that is a 500
-  // for a typo, and it would make the repository's throw mean something other
-  // than what the README says a throw means: a bug or an infrastructure
-  // failure. Checked here, both stay true.
-  const known = await lockerSizes.findAll()
-
-  if (!known.some((size) => size.code === details.data.sizeCode)) {
-    return badRequest(
-      `"${details.data.sizeCode}" is not a locker size. Known sizes: ${known
-        .map((size) => size.code)
-        .join(", ")}.`
-    )
-  }
-
-  const created = await lockers.create(details.data, {
-    actingUserId: session.value.user.id,
+  // Whether the size exists, whether the station exists and whether the label is
+  // free are all decisions about the estate, so they belong to the domain. This
+  // handler only says which status each answer becomes.
+  const installed = await installLocker.install({
+    ...details.data,
+    audit: { actingUserId: session.value.user.id },
   })
 
-  if (created === null) {
-    // The label is taken at that station. A conflict, not a server fault and
-    // not a malformed request — the caller sent something reasonable that the
-    // current state refuses.
-    return errorResponse(
-      "LockerLabelTaken",
-      `A locker labelled "${details.data.label}" already exists at that station.`,
-      409
-    )
-  }
+  if (isErr(installed)) return toHttpResponse(installed.error)
 
-  return Response.json(toLockerDto(created), { status: 201 })
+  return Response.json(toLockerDto(installed.value), { status: 201 })
 }

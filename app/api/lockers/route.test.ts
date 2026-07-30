@@ -192,6 +192,26 @@ describe("/api/lockers", () => {
       })
     })
 
+    it("answers 404, not 500, for a station that does not exist", async () => {
+      signedInAs("admin")
+
+      // A well-formed uuid naming no station used to reach the foreign key and
+      // surface as a server error. The station is checked before the insert, so
+      // the caller is told what is actually wrong.
+      const response = await POST(
+        request("http://test/api/lockers", {
+          stationId: "019fb1ad-d64b-7fe4-bde0-000000000000",
+          sizeCode: "S",
+          label: "D9",
+        })
+      )
+
+      expect(response.status).toBe(404)
+      expect(await response.json()).toMatchObject({
+        error: { code: "StationNotFound" },
+      })
+    })
+
     it("stamps the acting admin on the row it created", async () => {
       signedInAs("admin")
 

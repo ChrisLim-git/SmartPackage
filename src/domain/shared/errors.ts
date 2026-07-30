@@ -64,6 +64,17 @@ export type CustomerNotFound = {
   readonly message: string
 }
 
+/**
+ * A label is unique within a station, so this carries both — the same label at
+ * another station is not a conflict, it is the normal case.
+ */
+export type LockerLabelTaken = {
+  readonly code: "LockerLabelTaken"
+  readonly stationId: string
+  readonly label: string
+  readonly message: string
+}
+
 export type DomainError =
   | NoSuitableLockerAvailable
   | LockerAlreadyOccupied
@@ -73,6 +84,7 @@ export type DomainError =
   | MalformedInput
   | StationNotFound
   | CustomerNotFound
+  | LockerLabelTaken
 
 /** Nothing free at the station fits the package. Normal, not exceptional. */
 export const noSuitableLockerAvailable = (
@@ -145,4 +157,18 @@ export const customerNotFound = (customerId: string): CustomerNotFound => ({
   code: "CustomerNotFound",
   customerId,
   message: `No customer with id ${customerId}.`,
+})
+
+/**
+ * An ordinary thing for an administrator to do twice, not an exceptional one —
+ * which is why it is a `Result` and not a throw.
+ */
+export const lockerLabelTaken = (
+  stationId: string,
+  label: string
+): LockerLabelTaken => ({
+  code: "LockerLabelTaken",
+  stationId,
+  label,
+  message: `A locker labelled "${label}" already exists at station ${stationId}.`,
 })

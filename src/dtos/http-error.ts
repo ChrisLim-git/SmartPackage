@@ -78,6 +78,14 @@ const RESPONSES: Record<
     code: "CustomerNotFound",
     message: "That customer does not exist.",
   },
+  // A conflict, not a server fault and not a malformed request: the caller sent
+  // something reasonable that the current state refuses. Replaced below with the
+  // label, which the caller supplied and so already knows.
+  LockerLabelTaken: {
+    status: 409,
+    code: "LockerLabelTaken",
+    message: "A locker with that label already exists at that station.",
+  },
 }
 
 export const toHttpResponse = (error: DomainError): Response => {
@@ -86,7 +94,13 @@ export const toHttpResponse = (error: DomainError): Response => {
   const message =
     error.code === "MalformedInput"
       ? `${error.field}: ${error.reason}.`
-      : mapped.message
+      : error.code === "LockerLabelTaken"
+        ? // Safe to echo, unlike an id: the caller typed this label into the
+          // form a moment ago, so naming it back confirms nothing they did not
+          // already supply — and an administrator fixing a clash needs to see
+          // which one clashed.
+          `A locker labelled "${error.label}" already exists at that station.`
+        : mapped.message
 
   return errorResponse(mapped.code, message, mapped.status)
 }

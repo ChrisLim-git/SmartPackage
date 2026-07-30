@@ -11,14 +11,13 @@ import type { PickupCodeHasher } from "../interfaces/pickup-code-hasher"
 import type { UnitOfWork } from "../interfaces/unit-of-work"
 import {
   type MalformedInput,
-  malformedInput,
   type NoSuitableLockerAvailable,
   noSuitableLockerAvailable,
   type StationNotFound,
   stationNotFound,
 } from "../shared/errors"
 import { err, isErr, ok, type Result } from "../shared/result"
-import { PackageSize } from "../utils/size"
+import { findSizeByCode, PackageSize } from "../utils/size"
 
 export type StorePackageCommand = {
   readonly stationId: string
@@ -186,23 +185,17 @@ export class StorePackageService {
   private async resolveSize(
     code: string
   ): Promise<Result<PackageSize, MalformedInput>> {
-    const ladder = await this.dependencies.lockerSizes.findAll()
-    const match = ladder.find((size) => size.code === code)
+    const match = findSizeByCode(
+      await this.dependencies.lockerSizes.findAll(),
+      code,
+      "packageSize"
+    )
 
-    if (match === undefined) {
-      return err(
-        malformedInput(
-          "packageSize",
-          `"${code}" is not a package size — known sizes are ${ladder
-            .map((size) => size.code)
-            .join(", ")}`
-        )
-      )
-    }
+    if (isErr(match)) return match
 
     // A locker's capacity and a package's requirement are deliberately not
     // assignable to each other, so the ladder row is rebuilt as the one this
     // flow needs rather than passed through.
-    return PackageSize.create(match)
+    return PackageSize.create(match.value)
   }
 }

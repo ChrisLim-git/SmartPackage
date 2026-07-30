@@ -18,7 +18,7 @@ const config = {
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   globalSetup: "<rootDir>/jest.global-setup.mjs",
-  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.mjs"],
 
   transform: {
     "^.+\\.(t|j)sx?$": [

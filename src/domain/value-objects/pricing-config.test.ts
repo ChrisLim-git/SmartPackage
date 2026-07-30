@@ -40,6 +40,25 @@ describe("FeeTier", () => {
     ).toBe(true)
   })
 
+  it("accepts every multiplier the currency can express", () => {
+    // A float tolerance rejected 255 of these: 2.2 * 100 is
+    // 220.00000000000003, which is further from a whole number than
+    // Number.EPSILON allows, so a x2.2 band was unconfigurable.
+    for (const multiplier of [2.2, 2.01, 8.7, 0.07, 1.1, 3.3, 19.99]) {
+      expect(
+        isErr(FeeTier.create({ fromDay: 1, toDay: null, multiplier }))
+      ).toBe(false)
+    }
+  })
+
+  it("keeps the two-decimal multiplier at the value it was given", () => {
+    const tier = unwrap(
+      FeeTier.create({ fromDay: 1, toDay: null, multiplier: 2.2 })
+    )
+
+    expect(tier.multiplierHundredths).toBe(220)
+  })
+
   it("rejects fractional day boundaries", () => {
     expect(
       isErr(FeeTier.create({ fromDay: 1.5, toDay: 5, multiplier: 1 }))

@@ -2,7 +2,7 @@
 
 A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker and a pickup code; the recipient enters the code, learns the fee, and the locker opens.
 
-> **Status: in progress.** The scaffold, test harness, architectural enforcement and database are in place; the domain is being built next. See [Progress](#progress).
+> **Status: in progress.** The scaffold, test harness, architectural enforcement, database and the whole domain core are in place; use cases and the interface come next. See [Progress](#progress).
 
 ## Running it
 
@@ -39,7 +39,7 @@ A single file, and a single test by name:
 
 ```bash
 pnpm test src/domain/value-objects/money.test.ts
-pnpm test -- -t "charges two tiers across a 7-day stay"
+pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it and jest reads it as a path
 ```
 
 ## Architecture
@@ -61,20 +61,23 @@ This is not decoration. The load-bearing rules — locker allocation, fee tierin
 
 `src/infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
 
-**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date()`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` ports — that is what makes the domain tests both instant and deterministic.
+**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` ports — that is what makes the domain tests both instant and deterministic.
+
+Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
 
 ### Ports
 
 Every source of non-determinism is a port, which is why the domain tests need no mocking framework:
 
-| Port                                                             | Declared in | Real                                            | Test double                |
-| ---------------------------------------------------------------- | ----------- | ----------------------------------------------- | -------------------------- |
-| `Clock`                                                          | domain      | `SystemClock`                                   | `FixedClock(instant)`      |
-| `IdGenerator`                                                    | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`    |
-| `PickupCodeGenerator`                                            | domain      | `RandomPickupCodeGenerator`                     | `StubCodeGenerator([...])` |
-| `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed    |
-| `*Repository`, `UnitOfWork`                                      | application | Drizzle                                         | in-memory fakes            |
-| `NotificationPort`                                               | application | `LoggingNotifier`                               | `RecordingNotifier`        |
+| Port                                                             | Declared in | Real                                            | Test double                               |
+| ---------------------------------------------------------------- | ----------- | ----------------------------------------------- | ----------------------------------------- |
+| `Clock`                                                          | domain      | `SystemClock`                                   | `FixedClock(instant)`, `AdvanceableClock` |
+| `IdGenerator`                                                    | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`                   |
+| `PickupCodeGenerator`                                            | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
+| `PickupCodeHasher`                                               | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
+| `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
+| `*Repository`, `UnitOfWork`                                      | application | Drizzle                                         | in-memory fakes                           |
+| `NotificationPort`                                               | application | `LoggingNotifier`                               | `RecordingNotifier`                       |
 
 `NotificationPort` exists to make a boundary that is out of scope _visible_ rather than absent.
 
@@ -95,7 +98,7 @@ Domain and application return `Result<T, E>`. "No suitable locker" and "wrong pi
 ### Data
 
 - **Money never touches a float.** Integer minor units in the domain, `numeric(12,2)` in Postgres, never Drizzle's `mode: 'number'`. Rounded half-up once on the final total, never per tier.
-- **Pickup codes are stored hashed** and compared by hash. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker.
+- **Pickup codes are stored hashed** and compared by hash, in constant time. A code is a bearer credential for a physical object; plaintext at rest would make a database read a master key to every locker. The hash is HMAC-SHA256 under a server-side pepper (`PICKUP_CODE_PEPPER`) rather than a bare digest — six digits is a million candidates, which a bare digest column gives up in seconds.
 - **UUIDv7 primary keys**, generated through `IdGenerator` so entities are valid before they reach a repository, with `DEFAULT uuidv7()` as a safety net. Postgres 18 provides `uuidv7()` natively — no extension.
 - **Five audit columns on every domain table**: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`. Deliberately no `deleted_by` — a soft delete is a write, so `updated_by` already records the actor. Reads filter `deleted_at IS NULL` in the base repository helper, so use cases never write that filter.
 - Better Auth owns `user`, `session`, `account`, `verification`; its schema is CLI-generated and editing it invites drift on every regeneration.
@@ -119,7 +122,7 @@ src/infrastructure/**/*.test.ts  real Postgres, truncated between
 app/api/**/*.test.ts             route handlers, real Postgres
 ```
 
-Tests are co-located (`foo.ts` → `foo.test.ts`) and named as behaviour, not method — `charges 9× for a 7-day stay across two tiers`, not `calculateFee works`.
+Tests are co-located (`foo.ts` → `foo.test.ts`) and named as behaviour, not method — `charges a seven-day stay piecewise, at 9x base and not 14x`, not `calculateFee works`. A few files cover a pair that only makes sense together: the two locker policies share `locker-policies.test.ts`, and `FeeTier` is tested through `pricing-config.test.ts`, because a tier is only meaningful inside a validated tier set.
 
 Use-case tests attach to the **repository port** with in-memory fakes rather than to a database. That is what keeps `test:unit` sub-second.
 
@@ -153,11 +156,11 @@ Commits follow Conventional Commits with the scopes `domain`, `application`, `in
 
 ## Progress
 
-|                                                                          |         |
-| ------------------------------------------------------------------------ | ------- |
-| Scaffold, test harness, boundary lint, Postgres, debug configs           | done    |
-| Domain core — value objects, entities, policies                          | next    |
-| User management, master data, store/retrieve/fees, concurrency hardening | to come |
+|                                                                          |                         |
+| ------------------------------------------------------------------------ | ----------------------- |
+| Scaffold, test harness, boundary lint, Postgres, debug configs           | done                    |
+| Domain core — value objects, entities, policies                          | done — 168 tests, 0.55s |
+| User management, master data, store/retrieve/fees, concurrency hardening | to come                 |
 
 Known gaps are tracked here as they arise rather than discovered by a reader:
 

@@ -1,11 +1,9 @@
 import { isErr } from "../shared/result"
+import { MULTIPLIER_SCALE } from "../value-objects/fee-tier"
 import type { Money } from "../value-objects/money"
 import type { PricingConfig } from "../value-objects/pricing-config"
 import type { StorageDuration } from "../value-objects/storage-duration"
 import type { StorageFeePolicy } from "./storage-fee-policy"
-
-/** Matches `FeeTier`'s scale: multipliers are integer hundredths. */
-const MULTIPLIER_SCALE = 100
 
 /**
  * Charges each band at its own rate and adds the bands up.

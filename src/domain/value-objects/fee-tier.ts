@@ -2,7 +2,10 @@ import { type MalformedInput, malformedInput } from "../shared/errors"
 import { err, ok, type Result } from "../shared/result"
 
 /** Multipliers are held in hundredths, so ×1.5 is 150 and the arithmetic stays integral. */
-const MULTIPLIER_SCALE = 100
+export const MULTIPLIER_SCALE = 100
+
+/** Digits, then optionally a point and one or two more. Same shape a two-decimal currency accepts. */
+const MULTIPLIER_PATTERN = /^\d+(\.\d{1,2})?$/
 
 export type FeeTierAttributes = {
   readonly fromDay: number
@@ -50,11 +53,11 @@ export class FeeTier {
       )
     }
 
-    const hundredths = multiplier * MULTIPLIER_SCALE
-    if (
-      Math.abs(hundredths - Math.round(hundredths)) >
-      Number.EPSILON * MULTIPLIER_SCALE
-    ) {
+    // Decided on the decimal the caller wrote, not on the float it became.
+    // `2.2 * 100` is 220.00000000000003, so any tolerance tight enough to
+    // catch a third decimal place also rejects 2.2 — 255 of the 2000
+    // two-decimal multipliers, silently, and a x2.2 band cannot be configured.
+    if (!MULTIPLIER_PATTERN.test(String(multiplier))) {
       // More precision than the currency has would need a rounding rule that
       // nobody has stated.
       return err(
@@ -65,7 +68,9 @@ export class FeeTier {
       )
     }
 
-    return ok(new FeeTier(fromDay, toDay, Math.round(hundredths)))
+    return ok(
+      new FeeTier(fromDay, toDay, Math.round(multiplier * MULTIPLIER_SCALE))
+    )
   }
 
   get isUnbounded(): boolean {

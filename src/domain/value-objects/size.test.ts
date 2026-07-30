@@ -1,5 +1,5 @@
 import { isErr, type Result } from "../shared/result"
-import { LockerSize, PackageSize, type Size } from "./size"
+import { LockerSize, PackageSize, Size } from "./size"
 
 const unwrap = <T>(result: Result<T, { message: string }>): T => {
   if (isErr(result)) {

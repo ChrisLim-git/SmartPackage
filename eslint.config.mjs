@@ -178,7 +178,51 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": [
         "error",
         {
+          // Production domain code constructs no Date at all — every instant it
+          // works with was handed to it. The narrower zero-argument form is
+          // allowed only in domain *tests*, which have to pin an instant; see
+          // the override below.
           selector: "NewExpression[callee.name='Date']",
+          message:
+            "domain must take time from the Clock port, not `new Date()`.",
+        },
+        {
+          selector: "MemberExpression[object.name='Date'][property.name='now']",
+          message:
+            "domain must take time from the Clock port, not `Date.now()`.",
+        },
+        {
+          selector:
+            "MemberExpression[object.name='Math'][property.name='random']",
+          message:
+            "domain must take randomness from a port (IdGenerator / PickupCodeGenerator), not `Math.random()`.",
+        },
+        {
+          selector: "MemberExpression[object.name='crypto']",
+          message:
+            "domain must take ids from the IdGenerator port, not the crypto global.",
+        },
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message: "domain must not read configuration; pass it in.",
+        },
+      ],
+    },
+  },
+
+  {
+    // A domain test has to be able to pin an instant, so it may build a Date
+    // *from a value* — `new Date("2026-01-01T00:00:00.000Z")`. The
+    // zero-argument call still reaches for the machine clock and is still
+    // rejected here, as are Date.now, Math.random, crypto and process.env,
+    // which this override does not touch.
+    files: ["src/domain/**/*.test.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message:
             "domain must take time from the Clock port, not `new Date()`.",
         },

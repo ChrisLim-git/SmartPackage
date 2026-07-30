@@ -14,6 +14,7 @@ Read [DESIGN.md](./DESIGN.md) before touching UI.
 ## Things that will waste your time if you guess
 
 - **Tests run as ESM.** `"type": "module"` + `NODE_OPTIONS=--experimental-vm-modules` + `@swc/jest`. Not `next/jest`, not `ts-jest` — `better-auth` ships no CJS build. Default environment is `node`; a component test opts into the DOM with a `/** @jest-environment jsdom */` docblock on line 1.
+- **The `jest` global does not exist in the tests.** `describe`, `it` and `expect` are injected, but ESM leaves `jest` itself out — `jest.fn()` fails with `ReferenceError: jest is not defined`. Import it from `@jest/globals`, or in the domain just count calls in a closure; a pure layer needs no mocking framework.
 - **`@next/env` is CommonJS.** `drizzle.config.ts` is bundled to CJS by drizzle-kit and uses a _named_ import; `jest.global-setup.mjs` is real ESM and uses a _default_ import. Both are correct. Don't "fix" either.
 - **`boundaries/elements` patterns are bare directories** (`"src/domain"`). `"src/domain/**/*"` leaves files sitting directly in the folder unclassified, and every policy then skips them **without reporting anything**. `boundaries/external` and `mode:` are both deprecated in v7 — external packages are restricted with `no-restricted-imports` instead.
 - **Postgres 18's image mounts at `/var/lib/postgresql`**, not `/var/lib/postgresql/data`. `docker/init-test-db.sql` only runs on first initialisation of the volume; after a schema-breaking change, `docker compose down -v`.

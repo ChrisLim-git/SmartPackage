@@ -44,3 +44,6 @@ next-env.d.ts
 
 # agent tooling lives outside the deliverable
 .claude/
+
+# Agent guidance that names a specific tool. Kept locally, never committed.
+CLAUDE.md

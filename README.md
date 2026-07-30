@@ -13,8 +13,21 @@ pnpm install
 cp .env.example .env.local          # then fill it in — see the comments in the file
 docker compose up -d --wait         # Postgres 18
 pnpm db:migrate
+pnpm db:seed                        # three accounts, one per role
 pnpm dev                            # http://localhost:3000
 ```
+
+### Signing in
+
+`pnpm db:seed` creates one account per role, all with the password **`smartpackage`**. Re-running it leaves existing accounts alone.
+
+| Email                        | Role       | Lands on       |
+| ---------------------------- | ---------- | -------------- |
+| `admin@smartpackage.test`    | `admin`    | `/admin`       |
+| `agent@smartpackage.test`    | `agent`    | `/agent/store` |
+| `customer@smartpackage.test` | `customer` | `/`            |
+
+These are demo credentials on a local database, published so a reviewer never has to guess. Roles are **granted, never chosen**: `role` is configured with `input: false`, so a sign-up that posts `role: "admin"` still gets a customer — asserted by a test, and by a request over real HTTP.
 
 Hooks are not cloned, so enable the commit guard once per clone:
 

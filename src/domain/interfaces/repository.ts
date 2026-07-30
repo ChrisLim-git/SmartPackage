@@ -32,7 +32,20 @@ export interface Repository<TEntity> {
   findAll(): Promise<TEntity[]>
 }
 
-export type StationRepository = Repository<Station>
+export type StationRepository = Repository<Station> & {
+  /**
+   * Brings a station online.
+   *
+   * No conflict case, unlike a locker's label: there is deliberately no unique
+   * index on a station's name, because a name is a label an operator may want
+   * to change and a constraint would make renaming one a migration. Two
+   * stations may legitimately share a name; the id is the identity.
+   */
+  create(
+    details: { name: string; address: string },
+    actor: AuditContext
+  ): Promise<Station>
+}
 
 /** Read-only: the size ladder is master data, edited by a migration and a seed. */
 export type LockerSizeRepository = Pick<Repository<LockerSize>, "findAll">

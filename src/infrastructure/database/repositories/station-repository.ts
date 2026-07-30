@@ -2,6 +2,7 @@ import { asc, type SQL } from "drizzle-orm"
 import type { PgColumn } from "drizzle-orm/pg-core"
 
 import { Station } from "@domain/entities/station"
+import type { AuditContext } from "@domain/interfaces/audit-context"
 
 import { station } from "../schema/station"
 import { EntityRepository } from "./base-repository"
@@ -19,6 +20,22 @@ export class StationRepository extends EntityRepository<
       Station.create({ id: row.id, name: row.name, address: row.address }),
       row.id
     )
+  }
+
+  /**
+   * No `onConflictDoNothing` and no null return, unlike a locker: nothing about
+   * a station is unique, so there is no conflict for the insert to lose.
+   */
+  async create(
+    details: { name: string; address: string },
+    actor: AuditContext
+  ): Promise<Station> {
+    const [row] = await this.query
+      .insert(station)
+      .values({ ...details, ...this.stamp(actor) })
+      .returning()
+
+    return this.toEntity(row)
   }
 
   /**

@@ -1,4 +1,5 @@
 import { InstallLockerService } from "@domain/services/install-locker-service"
+import { RegisterStationService } from "@domain/services/register-station-service"
 import { RetrievePackageService } from "@domain/services/retrieve-package-service"
 import { StorePackageService } from "@domain/services/store-package-service"
 import { TieredDailyRateFeeService } from "@domain/services/tiered-daily-rate-fee-service"
@@ -56,6 +57,8 @@ export const installLocker = new InstallLockerService({
   lockerSizes,
   stations,
 })
+
+export const registerStation = new RegisterStationService({ stations })
 
 export const storePackage = new StorePackageService({
   stations,

@@ -14,7 +14,7 @@ import type {
 import { Customer } from "@domain/entities/customer"
 import { Locker } from "@domain/entities/locker"
 import type { Package } from "@domain/entities/package"
-import type { Station } from "@domain/entities/station"
+import { Station } from "@domain/entities/station"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { OrdinalFitService } from "@domain/services/ordinal-fit-service"
 import { SmallestFitFirstService } from "@domain/services/smallest-fit-first-service"
@@ -39,6 +39,26 @@ import type { LockerSize, PackageSize } from "@domain/utils/size"
 
 export class InMemoryStationRepository implements StationRepository {
   constructor(private readonly stations: Station[] = []) {}
+
+  async create(
+    details: { name: string; address: string },
+    _actor: AuditContext
+  ): Promise<Station> {
+    const created = Station.create({
+      id: `station-${this.stations.length + 1}`,
+      name: details.name,
+      address: details.address,
+    })
+
+    if (isErr(created)) {
+      // A bug, not caller input: the service validates before it gets here.
+      throw new Error(`cannot create a station: ${created.error.message}`)
+    }
+
+    this.stations.push(created.value)
+
+    return created.value
+  }
 
   async findById(id: string): Promise<Station | null> {
     return this.stations.find((station) => station.id === id) ?? null

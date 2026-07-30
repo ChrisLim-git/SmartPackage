@@ -23,11 +23,13 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCreateLocker } from "@/hooks/use-create-locker"
+import { useCreateStation } from "@/hooks/use-create-station"
 import { useLockers } from "@/hooks/use-lockers"
 import { useLockerSizes } from "@/hooks/use-locker-sizes"
 import { useStations } from "@/hooks/use-stations"
 
 import { CreateLockerDialog } from "./create-locker-dialog"
+import { CreateStationDialog } from "./create-station-dialog"
 
 /**
  * Radix reserves the empty string on a `SelectItem` for "clear the selection",
@@ -88,6 +90,7 @@ export const LockerAdmin = () => {
   const sizes = useLockerSizes()
   const lockers = useLockers()
   const created = useCreateLocker()
+  const createdStation = useCreateStation()
 
   const isLoading = stations.isLoading || sizes.isLoading || lockers.isLoading
   const capacity =
@@ -105,7 +108,15 @@ export const LockerAdmin = () => {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <h2 className="font-heading text-lg">Capacity</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-heading text-lg">Capacity</h2>
+          {/* Beside capacity rather than beside the locker list: a station is
+              the thing a locker needs to exist first, so this is where an
+              administrator looks when the table has nothing in it. */}
+          <CreateStationDialog
+            onCreate={(details) => createdStation.mutateAsync(details)}
+          />
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

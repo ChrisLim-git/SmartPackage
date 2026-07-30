@@ -63,7 +63,10 @@ const config = {
     "^@/(.*)$": "<rootDir>/$1",
   },
 
-  testPathIgnorePatterns: ["/node_modules/", "/.next/"],
+  // `/.claude/` holds a git worktree — a second checkout of this repo. Without
+  // it, every suite runs twice and the other checkout's failures are reported
+  // as this one's.
+  testPathIgnorePatterns: ["/node_modules/", "/.next/", "/.claude/"],
   coveragePathIgnorePatterns: [
     "/node_modules/",
     "/.next/",

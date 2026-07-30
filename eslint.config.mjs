@@ -265,6 +265,11 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "coverage/**",
     "drizzle/**",
+    // A git worktree lives here, which is a second full checkout of this repo.
+    // Without this every tool lints, typechecks, formats and *runs the tests of*
+    // both copies — the suite silently doubles and reports another commit's
+    // failures as this one's.
+    ".claude/**",
   ]),
 ])
 

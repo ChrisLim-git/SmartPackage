@@ -73,7 +73,7 @@ export const packageTable = pgTable(
     ...auditColumns,
   },
   (table) => [
-    // A code identifies a parcel on its own — the recipient types six digits and
+    // A code identifies a parcel on its own — the recipient types six characters and
     // nothing else — so two stored parcels sharing one would mean a code that
     // opens whichever locker the query happened to return first.
     //

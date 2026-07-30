@@ -1,4 +1,4 @@
-import { AdvanceableClock, FixedClock } from "@/utils/clocks"
+import { AdvanceableClock, FixedClock } from "@/utils/fake-clocks"
 
 /**
  * The contract every `Clock` implementation must keep, exercised through the

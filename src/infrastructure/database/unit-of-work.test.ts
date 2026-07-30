@@ -3,7 +3,7 @@ import { Money } from "@domain/utils/money"
 import { PickupCode } from "@domain/utils/pickup-code"
 import { PackageSize } from "@domain/utils/size"
 
-import { FixedClock } from "@/utils/clocks"
+import { FixedClock } from "@/utils/fake-clocks"
 import { FakePickupCodeHasher } from "@/utils/fake-pickup-code-hasher"
 import {
   clearNetwork,
@@ -13,7 +13,7 @@ import {
 import { createTestDb } from "@/utils/test-db"
 import { unwrap } from "@/utils/unwrap"
 
-import { UuidV7Generator } from "../generators/uuid-v7-generator"
+import { UuidV7Generator } from "@/utils/uuid-v7-generator"
 import { PackageRepository } from "./repositories/package-repository"
 import { UnitOfWork } from "./unit-of-work"
 
@@ -55,7 +55,7 @@ describe("UnitOfWork", () => {
         customerId: network.customerId,
         size: size(),
         lockerId: network.lockerIds["S1"],
-        code: unwrap(PickupCode.create("402913")),
+        code: unwrap(PickupCode.create("K4M9PT")),
         hasher,
         clock: new FixedClock(STORED_AT),
       })

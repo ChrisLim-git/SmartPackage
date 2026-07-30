@@ -17,7 +17,7 @@ import type { StorageFeeService } from "./storage-fee-service"
 
 export type RetrievePackageCommand = {
   /**
-   * Six digits, and the whole request.
+   * Six characters, and the whole request.
    *
    * The recipient has a code in a message and nothing else — no account, no
    * station, no locker number — so the code has to identify the parcel by itself.

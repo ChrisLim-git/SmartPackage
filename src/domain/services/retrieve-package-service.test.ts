@@ -11,7 +11,7 @@ import { Money } from "@domain/utils/money"
 import { PricingConfig } from "@domain/utils/pricing-config"
 import { LockerSize } from "@domain/utils/size"
 
-import { AdvanceableClock } from "@/utils/clocks"
+import { AdvanceableClock } from "@/utils/fake-clocks"
 import { FakePickupCodeHasher } from "@/utils/fake-pickup-code-hasher"
 import {
   InMemoryCustomerRepository,
@@ -22,7 +22,7 @@ import {
   InMemoryStationRepository,
   InMemoryUnitOfWork,
 } from "@/utils/in-memory-repositories"
-import { SequentialIdGenerator } from "@/utils/sequential-id-generator"
+import { SequentialIdGenerator } from "@/utils/stub-sequential-id-generator"
 import { StubPickupCodeGenerator } from "@/utils/stub-pickup-code-generator"
 import { unwrap } from "@/utils/unwrap"
 
@@ -30,7 +30,7 @@ import { unwrap } from "@/utils/unwrap"
  * Levels 2 and 3 together: a collection is validated, priced and completed, or
  * none of those things happen.
  *
- * The code is the whole request. A recipient has six digits from a message and no
+ * The code is the whole request. A recipient has six characters from a message and no
  * account, no station and no locker number, so everything here goes in through
  * `StorePackageService` first — a hand-built fixture could describe a state the
  * store flow cannot produce, and a collection test starting from an impossible
@@ -43,8 +43,8 @@ const STORED_AT = new Date("2026-03-01T09:00:00.000Z")
 const AUDIT: AuditContext = { actingUserId: AGENT_ID }
 const PUBLIC: AuditContext = { actingUserId: null }
 
-const FIRST_CODE = "402913"
-const SECOND_CODE = "581274"
+const FIRST_CODE = "K4M9PT"
+const SECOND_CODE = "R7WX2D"
 
 const small = unwrap(LockerSize.create({ code: "S", rank: 1, label: "Small" }))
 
@@ -176,8 +176,8 @@ describe("collecting a package", () => {
 
     const result = await retrieve.execute(collection(second.pickupCode))
 
-    // Two parcels in two lockers, and six digits pick the right one. This is what
-    // lets the collect screen be a single field.
+    // Two parcels in two lockers, and six characters pick the right one. This is
+    // what lets the collect screen be a single field.
     expect(isOk(result) && result.value.lockerLabel).toBe(second.lockerLabel)
   })
 
@@ -239,7 +239,7 @@ describe("collecting a package", () => {
       const { store, retrieve } = setup()
 
       await storeOne(store)
-      const result = await retrieve.execute(collection("999999"))
+      const result = await retrieve.execute(collection("ZZZ999"))
 
       expect(isErr(result) && result.error.code).toBe("InvalidPickupRequest")
     })
@@ -276,7 +276,7 @@ describe("collecting a package", () => {
       await retrieve.execute(collection(pickupCode))
 
       const replayed = await retrieve.execute(collection(pickupCode))
-      const unknown = await retrieve.execute(collection("999999"))
+      const unknown = await retrieve.execute(collection("ZZZ999"))
 
       // Byte-identical. A distinguishable "already collected" would let someone
       // dialling codes learn which ones were real, and confirm one after the
@@ -288,7 +288,7 @@ describe("collecting a package", () => {
       const { store, retrieve, stored, lockers } = setup()
 
       await storeOne(store)
-      await retrieve.execute(collection("999999"))
+      await retrieve.execute(collection("ZZZ999"))
 
       expect(stored[0].status).toBe("stored")
       expect((await lockers.findById("locker-S1"))?.isAvailable()).toBe(false)

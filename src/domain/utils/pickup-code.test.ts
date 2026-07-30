@@ -1,7 +1,7 @@
 import { StubPickupCodeGenerator } from "@/utils/stub-pickup-code-generator"
 
 import { isErr, type Result } from "../shared/result"
-import { PickupCode } from "./pickup-code"
+import { PICKUP_CODE_ALPHABET, PickupCode } from "./pickup-code"
 
 const unwrap = <T>(result: Result<T, { message: string }>): T => {
   if (isErr(result)) {
@@ -13,26 +13,57 @@ const unwrap = <T>(result: Result<T, { message: string }>): T => {
 const code = (value: string): PickupCode => unwrap(PickupCode.create(value))
 
 describe("PickupCode", () => {
-  it("accepts six digits", () => {
-    expect(code("123456").toString()).toBe("123456")
+  it("accepts six characters from the alphabet", () => {
+    expect(code("K4M9PT").toString()).toBe("K4M9PT")
+    expect(code("234567").toString()).toBe("234567")
+    expect(code("ZYXWVT").toString()).toBe("ZYXWVT")
   })
 
-  it("keeps leading zeros — a code is a string, never a number", () => {
-    // The sneaky one. Anything that parses the code as a number turns
-    // "000123" into 123 and the locker never opens.
-    expect(code("000123").toString()).toBe("000123")
-    expect(code("000123").equals(code("000123"))).toBe(true)
-    expect(code("000123").toString()).not.toBe("123")
+  it("folds what a phone keyboard does to a typed code", () => {
+    // Lower case by default, and a trailing space from a paste. Both mean the
+    // same code, and refusing them would be refusing a correct answer.
+    expect(code("k4m9pt").toString()).toBe("K4M9PT")
+    expect(code(" K4M9PT ").toString()).toBe("K4M9PT")
+    expect(code("k4m9pt").equals(code("K4M9PT"))).toBe(true)
+  })
+
+  it("stays a string, so nothing can parse it into a number", () => {
+    // The sneaky one, and the reason the type exists: anything treating a code as
+    // numeric turns "234567" into arithmetic and loses codes with letters in
+    // them entirely.
+    expect(code("234567").toString()).toBe("234567")
+    expect(typeof code("234567").toString()).toBe("string")
+  })
+
+  it("rejects the characters deliberately left out of the alphabet", () => {
+    // 0/O and 1/I/L are the pairs a person misreads off a slip, and U is left out
+    // so six random characters cannot spell something unrepeatable. None is ever
+    // issued, so none is accepted — remapping O to 0 would turn one typo into a
+    // different valid code.
+    for (const value of [
+      "K4M9P0",
+      "K4M9PO",
+      "K4M9P1",
+      "K4M9PI",
+      "K4M9PL",
+      "K4M9PU",
+    ]) {
+      expect(isErr(PickupCode.create(value))).toBe(true)
+    }
+
+    for (const excluded of ["0", "1", "I", "L", "O", "U"]) {
+      expect(PICKUP_CODE_ALPHABET).not.toContain(excluded)
+    }
   })
 
   it("rejects anything that is not exactly six characters", () => {
-    expect(isErr(PickupCode.create("12345"))).toBe(true)
-    expect(isErr(PickupCode.create("1234567"))).toBe(true)
+    expect(isErr(PickupCode.create("K4M9P"))).toBe(true)
+    expect(isErr(PickupCode.create("K4M9PTX"))).toBe(true)
     expect(isErr(PickupCode.create(""))).toBe(true)
   })
 
-  it("rejects anything that is not a digit", () => {
-    for (const value of ["12345a", "12 456", "12-456", "12.456", "①②③④⑤⑥"]) {
+  it("rejects anything outside letters and digits", () => {
+    for (const value of ["K4M9P!", "K4 M9P", "K4-M9P", "K4.M9P", "①②③④⑤⑥"]) {
       expect(isErr(PickupCode.create(value))).toBe(true)
     }
   })
@@ -45,23 +76,23 @@ describe("PickupCode", () => {
   })
 
   it("compares by value, not by identity", () => {
-    expect(code("123456").equals(code("123456"))).toBe(true)
-    expect(code("123456").equals(code("654321"))).toBe(false)
+    expect(code("K4M9PT").equals(code("K4M9PT"))).toBe(true)
+    expect(code("K4M9PT").equals(code("TP9M4K"))).toBe(false)
   })
 })
 
 describe("StubPickupCodeGenerator", () => {
   it("hands out the queued codes in order", () => {
-    const generator = new StubPickupCodeGenerator(["111111", "222222"])
+    const generator = new StubPickupCodeGenerator(["AAAAAA", "BBBBBB"])
 
-    expect(generator.generate().toString()).toBe("111111")
-    expect(generator.generate().toString()).toBe("222222")
+    expect(generator.generate().toString()).toBe("AAAAAA")
+    expect(generator.generate().toString()).toBe("BBBBBB")
   })
 
   it("throws once the queue is exhausted rather than repeating itself", () => {
-    // A test that outruns its stub has stopped testing what it says it
-    // tests. Failing loudly is the only useful behaviour here.
-    const generator = new StubPickupCodeGenerator(["111111"])
+    // A test that outruns its stub has stopped testing what it says it tests.
+    // Failing loudly is the only useful behaviour here.
+    const generator = new StubPickupCodeGenerator(["AAAAAA"])
     generator.generate()
 
     expect(() => generator.generate()).toThrow(/exhausted/i)

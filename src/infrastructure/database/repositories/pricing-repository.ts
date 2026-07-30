@@ -1,13 +1,12 @@
 import { asc } from "drizzle-orm"
 
-import type { PricingRepository as PricingRepositoryContract } from "@domain/interfaces/pricing-repository"
 import { isErr } from "@domain/shared/result"
 import { FeeTier } from "@domain/utils/fee-tier"
 import { Money } from "@domain/utils/money"
 import { PricingConfig } from "@domain/utils/pricing-config"
 
-import type { Db, DbOrTx } from "../client"
 import { feeTier, pricingConfig } from "../schema/pricing"
+import { BaseRepository } from "./base-repository"
 import { notDeleted } from "./soft-delete"
 
 /**
@@ -18,14 +17,14 @@ import { notDeleted } from "./soft-delete"
  * `parseFloat`. Concentrating it in one method means the money rule holds by
  * construction rather than by everyone remembering it.
  */
-export class PricingRepository implements PricingRepositoryContract {
-  constructor(private readonly db: DbOrTx) {}
+export class PricingRepository extends BaseRepository<typeof pricingConfig> {
+  protected readonly table = pricingConfig
 
   async currentConfig(): Promise<PricingConfig> {
-    const [config] = await (this.db as Db)
+    const [config] = await this.query
       .select()
       .from(pricingConfig)
-      .where(notDeleted(pricingConfig))
+      .where(this.visible)
       .limit(1)
 
     if (config === undefined) {
@@ -42,7 +41,7 @@ export class PricingRepository implements PricingRepositoryContract {
       )
     }
 
-    const rows = await (this.db as Db)
+    const rows = await this.query
       .select()
       .from(feeTier)
       .where(notDeleted(feeTier))

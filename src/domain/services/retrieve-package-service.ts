@@ -1,7 +1,7 @@
 import type { AuditContext } from "../interfaces/audit-context"
 import type { Clock } from "../interfaces/clock"
 import type { PickupCodeHasher } from "../interfaces/pickup-code-hasher"
-import type { PricingRepository } from "../interfaces/pricing-repository"
+import type { PricingRepository } from "../interfaces/repository"
 import type { UnitOfWork } from "../interfaces/unit-of-work"
 import {
   type InvalidPickupRequest,

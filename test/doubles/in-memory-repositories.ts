@@ -1,10 +1,12 @@
 import type { AuditContext } from "@domain/interfaces/audit-context"
-import type { CustomerRepository } from "@domain/interfaces/customer-repository"
-import type { LockerRepository } from "@domain/interfaces/locker-repository"
-import type { LockerSizeRepository } from "@domain/interfaces/locker-size-repository"
-import type { PackageRepository } from "@domain/interfaces/package-repository"
-import type { PricingRepository } from "@domain/interfaces/pricing-repository"
-import type { StationRepository } from "@domain/interfaces/station-repository"
+import type {
+  CustomerRepository,
+  LockerRepository,
+  LockerSizeRepository,
+  PackageRepository,
+  PricingRepository,
+  StationRepository,
+} from "@domain/interfaces/repository"
 import type {
   TransactionalRepositories,
   UnitOfWork,
@@ -27,7 +29,8 @@ import type { LockerSize, PackageSize } from "@domain/utils/size"
  * These are not mocks. Each holds real state and answers real queries, so a
  * service exercised against one is exercised properly — it just runs in
  * microseconds. What they cannot prove is anything about SQL, which is why the
- * Drizzle implementations are tested separately against real Postgres.
+ * Postgres implementations are tested separately, and only where they do
+ * something a generic repository would not.
  *
  * They have no importer until T401. That is deliberate: the fakes and the
  * repository interfaces were written together in T303, so the contract had a
@@ -103,6 +106,10 @@ export class InMemoryLockerRepository implements LockerRepository {
 
   async findById(id: string): Promise<Locker | null> {
     return this.lockers.find((locker) => locker.id === id) ?? null
+  }
+
+  async findAll(): Promise<Locker[]> {
+    return this.findAllWithAvailability()
   }
 
   async findByLabel(stationId: string, label: string): Promise<Locker | null> {
@@ -196,6 +203,10 @@ export class InMemoryCustomerRepository implements CustomerRepository {
 
   async findById(id: string): Promise<Customer | null> {
     return this.customers.find((customer) => customer.id === id) ?? null
+  }
+
+  async findAll(): Promise<Customer[]> {
+    return [...this.customers]
   }
 
   async findByEmail(email: string): Promise<Customer | null> {

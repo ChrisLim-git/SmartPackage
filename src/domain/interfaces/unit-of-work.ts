@@ -1,6 +1,8 @@
-import type { CustomerRepository } from "./customer-repository"
-import type { LockerRepository } from "./locker-repository"
-import type { PackageRepository } from "./package-repository"
+import type {
+  CustomerRepository,
+  LockerRepository,
+  PackageRepository,
+} from "./repository"
 
 /** The repositories a piece of work gets, all bound to the same transaction. */
 export type TransactionalRepositories = {

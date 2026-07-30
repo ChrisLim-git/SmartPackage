@@ -1,39 +1,31 @@
-import { asc } from "drizzle-orm"
+import { asc, type SQL } from "drizzle-orm"
+import type { PgColumn } from "drizzle-orm/pg-core"
 
-import type { LockerSizeRepository as LockerSizeRepositoryContract } from "@domain/interfaces/locker-size-repository"
-import { isErr } from "@domain/shared/result"
 import { LockerSize } from "@domain/utils/size"
 
-import type { Db, DbOrTx } from "../client"
 import { lockerSize } from "../schema/locker-size"
-import { notDeleted } from "./soft-delete"
+import { EntityRepository } from "./base-repository"
 
-export class LockerSizeRepository implements LockerSizeRepositoryContract {
-  constructor(private readonly db: DbOrTx) {}
+type LockerSizeRow = typeof lockerSize.$inferSelect
 
-  async findAll(): Promise<LockerSize[]> {
-    const rows = await (this.db as Db)
-      .select()
-      .from(lockerSize)
-      .where(notDeleted(lockerSize))
-      // By rank, which is the ladder itself — alphabetical would put L before
-      // M and S, and a size picker would read as nonsense.
-      .orderBy(asc(lockerSize.rank))
+export class LockerSizeRepository extends EntityRepository<
+  LockerSize,
+  typeof lockerSize
+> {
+  protected readonly table = lockerSize
 
-    return rows.map((row) => {
-      const size = LockerSize.create({
-        code: row.code,
-        rank: row.rank,
-        label: row.label,
-      })
+  protected toEntity(row: LockerSizeRow): LockerSize {
+    return this.rebuilt(
+      LockerSize.create({ code: row.code, rank: row.rank, label: row.label }),
+      row.id
+    )
+  }
 
-      if (isErr(size)) {
-        throw new Error(
-          `locker size ${row.id} is unreadable: ${size.error.message}`
-        )
-      }
-
-      return size.value
-    })
+  /**
+   * By rank, which is the ladder itself — alphabetical would put L before M and
+   * S, and a size picker would read as nonsense.
+   */
+  protected override order(): (SQL | PgColumn)[] {
+    return [asc(lockerSize.rank)]
   }
 }

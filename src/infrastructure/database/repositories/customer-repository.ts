@@ -1,71 +1,56 @@
 import { and, eq } from "drizzle-orm"
 
-import type { AuditContext } from "@domain/interfaces/audit-context"
-import type { CustomerRepository as CustomerRepositoryContract } from "@domain/interfaces/customer-repository"
 import { Customer } from "@domain/entities/customer"
+import type { AuditContext } from "@domain/interfaces/audit-context"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 import { isErr } from "@domain/shared/result"
 
-import type { Db, DbOrTx } from "../client"
+import type { DbOrTx } from "../client"
 import { customer } from "../schema/customer"
-import { notDeleted } from "./soft-delete"
+import { EntityRepository } from "./base-repository"
 
 type CustomerRow = typeof customer.$inferSelect
 
-/** A row is only ever built by this class, so an invalid one is a bug here, not bad input. */
-const toEntity = (row: CustomerRow): Customer => {
-  const entity = Customer.create({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    phone: row.phone,
-    userId: row.userId,
-  })
+export class CustomerRepository extends EntityRepository<
+  Customer,
+  typeof customer
+> {
+  protected readonly table = customer
 
-  if (isErr(entity)) {
-    throw new Error(
-      `customer ${row.id} cannot be read back from the database: ${entity.error.message}`
+  constructor(
+    db: DbOrTx,
+    private readonly ids: IdGenerator
+  ) {
+    super(db)
+  }
+
+  protected toEntity(row: CustomerRow): Customer {
+    return this.rebuilt(
+      Customer.create({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        userId: row.userId,
+      }),
+      row.id
     )
   }
 
-  return entity.value
-}
-
-export class CustomerRepository implements CustomerRepositoryContract {
-  constructor(
-    private readonly db: DbOrTx,
-    private readonly ids: IdGenerator
-  ) {}
-
-  async findById(id: string): Promise<Customer | null> {
-    const [row] = await (this.db as Db)
-      .select()
-      .from(customer)
-      .where(and(eq(customer.id, id), notDeleted(customer)))
-      .limit(1)
-
-    return row === undefined ? null : toEntity(row)
-  }
-
   async findByEmail(email: string): Promise<Customer | null> {
-    const [row] = await (this.db as Db)
+    const [row] = await this.query
       .select()
       .from(customer)
       // Folded, because the entity folds on the way in and a caller may not
       // have gone through one.
-      .where(
-        and(
-          eq(customer.email, email.trim().toLowerCase()),
-          notDeleted(customer)
-        )
-      )
+      .where(and(eq(customer.email, email.trim().toLowerCase()), this.visible))
       .limit(1)
 
-    return row === undefined ? null : toEntity(row)
+    return row === undefined ? null : this.toEntity(row)
   }
 
   async save(entity: Customer, actor: AuditContext): Promise<Customer> {
-    const [row] = await (this.db as Db)
+    const [row] = await this.query
       .insert(customer)
       .values({
         id: entity.id,
@@ -73,8 +58,7 @@ export class CustomerRepository implements CustomerRepositoryContract {
         email: entity.email,
         phone: entity.phone,
         userId: entity.userId,
-        createdBy: actor.actingUserId,
-        updatedBy: actor.actingUserId,
+        ...this.stamp(actor),
       })
       .onConflictDoUpdate({
         target: customer.id,
@@ -88,7 +72,7 @@ export class CustomerRepository implements CustomerRepositoryContract {
       })
       .returning()
 
-    return toEntity(row)
+    return this.toEntity(row)
   }
 
   /**
@@ -116,15 +100,14 @@ export class CustomerRepository implements CustomerRepositoryContract {
       throw new Error(`cannot create a customer: ${entity.error.message}`)
     }
 
-    const [row] = await (this.db as Db)
+    const [row] = await this.query
       .insert(customer)
       .values({
         id: entity.value.id,
         name: entity.value.name,
         email: entity.value.email,
         phone: entity.value.phone,
-        createdBy: actor.actingUserId,
-        updatedBy: actor.actingUserId,
+        ...this.stamp(actor),
       })
       .onConflictDoUpdate({
         target: customer.email,
@@ -134,6 +117,6 @@ export class CustomerRepository implements CustomerRepositoryContract {
       })
       .returning()
 
-    return toEntity(row)
+    return this.toEntity(row)
   }
 }

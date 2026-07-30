@@ -66,7 +66,7 @@ src/
 │   ├── utils/         value objects — values that validate themselves at construction
 │   ├── services/      swappable rules — fit, selection, fee (Strategy)
 │   ├── interfaces/    everything the domain needs but will not implement:
-│   │                  Clock, IdGenerator, PickupCode*, repositories, UnitOfWork
+│   │                  Clock, IdGenerator, PickupCode*, Repository<T>, UnitOfWork
 │   └── shared/        Result, error taxonomy
 ├── dtos/              wire shapes — imports domain; the domain never imports back
 └── infrastructure/    imports domain + dtos
@@ -89,7 +89,7 @@ The direction is not conveyed by the folder names, so it is enforced instead: `p
 
 `app/` is the controller layer and cannot move: Next's routing is file-system based, so a route handler only exists at `app/**/route.ts`. **There is no separate use-case layer.** A handler guards, validates, delegates and maps — nothing else. Every concrete implementation it delegates to is wired in `container.ts`.
 
-**The behaviour lives in `src/domain/services/`**, and it can, because the repository and `UnitOfWork` contracts live in `src/domain/interfaces/`. A domain service orchestrating a whole flow still imports nothing outside the domain, so storing and retrieving a package are tested the same way a fee calculation is: no database, no HTTP, no framework, in milliseconds. The in-memory repositories in `test/doubles/` are what make that possible.
+**The behaviour lives in `src/domain/services/`**, and it can, because the `Repository<T>` and `UnitOfWork` contracts live in `src/domain/interfaces/`. A domain service orchestrating a whole flow still imports nothing outside the domain, so storing and retrieving a package are tested the same way a fee calculation is: no database, no HTTP, no framework, in milliseconds. The in-memory repositories in `test/doubles/` are what make that possible.
 
 That is the payoff from putting the contracts in the domain rather than a layer above it. A flow that needs a repository does not need to leave.
 
@@ -130,8 +130,12 @@ Every source of non-determinism is an interface, which is why the domain tests n
 | `PickupCodeGenerator`                                               | domain      | `RandomPickupCodeGenerator`                     | `StubPickupCodeGenerator([...])`          |
 | `PickupCodeHasher`                                                  | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitService` / `LockerSelectionService` / `StorageFeeService` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
-| `*Repository`                                                       | domain      | Drizzle                                         | in-memory fakes                           |
-| `UnitOfWork`                                                        | domain      | `PostgresUnitOfWork` — _arrives with T402_      | `InMemoryUnitOfWork`                      |
+| `Repository<T>` and its aliases                                     | domain      | `EntityRepository` subclasses over Drizzle      | in-memory fakes                           |
+| `UnitOfWork`                                                        | domain      | `UnitOfWork` over `db.transaction` — _T403_     | `InMemoryUnitOfWork`                      |
+
+`Repository<T>` is the whole contract for storage: `findById` and `findAll`, generic in the entity, stated once. A collection that does something a generic one cannot — an indivisible locker claim, an address that resolves to a person, a fee table read as one validated object — adds just that method as an alias of the generic, in the same file. Six per-entity interface files collapsed into it.
+
+No implementation declares `implements`. TypeScript checks a repository against the shape structurally where it is handed to a service, to the `UnitOfWork` or to the container, which is the only place a mismatch could do harm. On the implementation side the shared mechanics — the connection that may be a transaction, the `deleted_at IS NULL` filter, the actor stamp, the one way to fail when a row will not rebuild — live in `BaseRepository`, and `EntityRepository` adds the single-table `findById` and `findAll` that five repositories used to hold a copy of each.
 
 There is no `Notifier`. Notification is out of scope, and an interface with a logging implementation and no caller would be an abstraction added for a need the spec does not have.
 

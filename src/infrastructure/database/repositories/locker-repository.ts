@@ -1,63 +1,55 @@
 import { and, asc, eq } from "drizzle-orm"
 
-import type { AuditContext } from "@domain/interfaces/audit-context"
-import type { LockerRepository as LockerRepositoryContract } from "@domain/interfaces/locker-repository"
 import { Locker } from "@domain/entities/locker"
-import { isErr } from "@domain/shared/result"
+import type { AuditContext } from "@domain/interfaces/audit-context"
 import { LockerSize, type PackageSize } from "@domain/utils/size"
 
-import type { Db, DbOrTx } from "../client"
 import { locker } from "../schema/locker"
 import { lockerSize } from "../schema/locker-size"
+import { BaseRepository } from "./base-repository"
 import { notDeleted } from "./soft-delete"
 
 type LockerRow = typeof locker.$inferSelect
 type SizeRow = typeof lockerSize.$inferSelect
 
 /**
- * `rehydrate`, not `create`: a locker read back from the database is whatever
- * it was left as, and forcing it through the creation path would hand every
- * occupied locker back empty.
+ * Extends the plain base rather than `EntityRepository`, because every read here
+ * joins the size ladder: a locker without its size cannot answer what fits in
+ * it, which is the only question the domain asks of one. Inheriting a
+ * single-table `findById` would have meant a locker that reads back sizeless.
  */
-const toEntity = (row: { locker: LockerRow; locker_size: SizeRow }): Locker => {
-  const size = LockerSize.create({
-    code: row.locker_size.code,
-    rank: row.locker_size.rank,
-    label: row.locker_size.label,
-  })
+export class LockerRepository extends BaseRepository<typeof locker> {
+  protected readonly table = locker
 
-  if (isErr(size)) {
-    throw new Error(
-      `locker size ${row.locker_size.id} is unreadable: ${size.error.message}`
+  /** `rebuild`, not `create`: a locker read back is whatever it was left as. */
+  private toEntity(row: { locker: LockerRow; locker_size: SizeRow }): Locker {
+    const size = this.rebuilt(
+      LockerSize.create({
+        code: row.locker_size.code,
+        rank: row.locker_size.rank,
+        label: row.locker_size.label,
+      }),
+      row.locker_size.id
+    )
+
+    return this.rebuilt(
+      Locker.rehydrate({
+        id: row.locker.id,
+        stationId: row.locker.stationId,
+        size,
+        label: row.locker.label,
+        status: row.locker.status,
+        // The locker table records *that* it is occupied; which package is in it
+        // is the package table's business, and only the collection path asks.
+        currentPackageId: null,
+      }),
+      row.locker.id
     )
   }
-
-  const entity = Locker.rehydrate({
-    id: row.locker.id,
-    stationId: row.locker.stationId,
-    size: size.value,
-    label: row.locker.label,
-    status: row.locker.status,
-    // The locker table records *that* it is occupied; which package is in it
-    // is the package table's business, and only the collection path asks.
-    currentPackageId: null,
-  })
-
-  if (isErr(entity)) {
-    throw new Error(
-      `locker ${row.locker.id} cannot be read back from the database: ${entity.error.message}`
-    )
-  }
-
-  return entity.value
-}
-
-export class LockerRepository implements LockerRepositoryContract {
-  constructor(private readonly db: DbOrTx) {}
 
   /** Every read needs the size, so every read is the same join. */
   private selectLockers() {
-    return (this.db as Db)
+    return this.query
       .select()
       .from(locker)
       .innerJoin(lockerSize, eq(lockerSize.id, locker.sizeId))
@@ -67,7 +59,7 @@ export class LockerRepository implements LockerRepositoryContract {
     details: { stationId: string; sizeCode: string; label: string },
     actor: AuditContext
   ): Promise<Locker | null> {
-    const [size] = await (this.db as Db)
+    const [size] = await this.query
       .select()
       .from(lockerSize)
       .where(and(eq(lockerSize.code, details.sizeCode), notDeleted(lockerSize)))
@@ -83,29 +75,32 @@ export class LockerRepository implements LockerRepositoryContract {
     // `onConflictDoNothing` rather than catching a Postgres error code: the
     // unique index is the thing that decides, and reading its verdict from an
     // empty result keeps the driver's error taxonomy out of this class.
-    const [row] = await (this.db as Db)
+    const [row] = await this.query
       .insert(locker)
       .values({
         stationId: details.stationId,
         sizeId: size.id,
         label: details.label,
-        createdBy: actor.actingUserId,
-        updatedBy: actor.actingUserId,
+        ...this.stamp(actor),
       })
       .onConflictDoNothing({ target: [locker.stationId, locker.label] })
       .returning()
 
     return row === undefined
       ? null
-      : toEntity({ locker: row, locker_size: size })
+      : this.toEntity({ locker: row, locker_size: size })
   }
 
   async findById(id: string): Promise<Locker | null> {
     const [row] = await this.selectLockers()
-      .where(and(eq(locker.id, id), notDeleted(locker)))
+      .where(and(eq(locker.id, id), this.visible))
       .limit(1)
 
-    return row === undefined ? null : toEntity(row)
+    return row === undefined ? null : this.toEntity(row)
+  }
+
+  async findAll(): Promise<Locker[]> {
+    return this.findAllWithAvailability()
   }
 
   async findByLabel(stationId: string, label: string): Promise<Locker | null> {
@@ -114,12 +109,12 @@ export class LockerRepository implements LockerRepositoryContract {
         and(
           eq(locker.stationId, stationId),
           eq(locker.label, label),
-          notDeleted(locker)
+          this.visible
         )
       )
       .limit(1)
 
-    return row === undefined ? null : toEntity(row)
+    return row === undefined ? null : this.toEntity(row)
   }
 
   async findAvailableAtStation(stationId: string): Promise<Locker[]> {
@@ -128,7 +123,7 @@ export class LockerRepository implements LockerRepositoryContract {
         and(
           eq(locker.stationId, stationId),
           eq(locker.status, "available"),
-          notDeleted(locker)
+          this.visible
         )
       )
       // Smallest first, then by label — the same order the selection policy
@@ -136,7 +131,7 @@ export class LockerRepository implements LockerRepositoryContract {
       // be given.
       .orderBy(asc(lockerSize.rank), asc(locker.label))
 
-    return rows.map(toEntity)
+    return rows.map((row) => this.toEntity(row))
   }
 
   async claimSmallestFitting(
@@ -154,21 +149,27 @@ export class LockerRepository implements LockerRepositoryContract {
   }
 
   async release(lockerId: string, actor: AuditContext): Promise<void> {
-    await (this.db as Db)
+    await this.query
       .update(locker)
       .set({ status: "available", updatedBy: actor.actingUserId })
       .where(eq(locker.id, lockerId))
   }
 
+  /**
+   * Every locker with its current status — L1's availability listing.
+   *
+   * Occupied lockers included, unlike `findAvailableAtStation`: an operator
+   * looking at a station needs to see it is full, not see an empty page.
+   */
   async findAllWithAvailability(stationId?: string): Promise<Locker[]> {
     const rows = await this.selectLockers()
       .where(
         stationId === undefined
-          ? notDeleted(locker)
-          : and(eq(locker.stationId, stationId), notDeleted(locker))
+          ? this.visible
+          : and(eq(locker.stationId, stationId), this.visible)
       )
       .orderBy(asc(lockerSize.rank), asc(locker.label))
 
-    return rows.map(toEntity)
+    return rows.map((row) => this.toEntity(row))
   }
 }

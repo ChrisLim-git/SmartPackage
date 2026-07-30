@@ -2,10 +2,12 @@ import { Package } from "../entities/package"
 import type { AuditContext } from "../interfaces/audit-context"
 import type { Clock } from "../interfaces/clock"
 import type { IdGenerator } from "../interfaces/id-generator"
-import type { LockerSizeRepository } from "../interfaces/locker-size-repository"
 import type { PickupCodeGenerator } from "../interfaces/pickup-code-generator"
+import type {
+  LockerSizeRepository,
+  StationRepository,
+} from "../interfaces/repository"
 import type { PickupCodeHasher } from "../interfaces/pickup-code-hasher"
-import type { StationRepository } from "../interfaces/station-repository"
 import type { UnitOfWork } from "../interfaces/unit-of-work"
 import {
   type MalformedInput,

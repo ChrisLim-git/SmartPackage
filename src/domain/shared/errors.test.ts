@@ -39,10 +39,10 @@ describe("domain errors", () => {
 
   it("compares by structure, so tests never match on message text", () => {
     expect(lockerAlreadyOccupied("locker-1")).toEqual(
-      lockerAlreadyOccupied("locker-1"),
+      lockerAlreadyOccupied("locker-1")
     )
     expect(lockerAlreadyOccupied("locker-1")).not.toEqual(
-      lockerAlreadyOccupied("locker-2"),
+      lockerAlreadyOccupied("locker-2")
     )
   })
 
@@ -72,7 +72,7 @@ describe("domain errors", () => {
     // The two are flattened into one response at the HTTP edge, but staying
     // distinct in the domain is what lets logs and tests tell them apart.
     expect(packageAlreadyRetrieved("package-1").code).not.toBe(
-      invalidPickupRequest().code,
+      invalidPickupRequest().code
     )
   })
 

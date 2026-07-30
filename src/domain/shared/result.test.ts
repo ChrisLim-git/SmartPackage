@@ -1,8 +1,27 @@
-import { err, isErr, isOk, map, mapErr, ok, type Result, unwrapOr } from "./result"
+import {
+  err,
+  isErr,
+  isOk,
+  map,
+  mapErr,
+  ok,
+  type Result,
+  unwrapOr,
+} from "./result"
+
+/**
+ * Both helpers exist to keep the declared type a union. A `const` initialised
+ * with `err("boom")` is narrowed by control flow to `Err<string>`, which leaves
+ * `map` no site to infer `T` from and types the callback's argument `unknown`.
+ * Real call sites hold the result of a function whose return type is the union,
+ * so they never hit it.
+ */
+const okResult = (value: number): Result<number, string> => ok(value)
+const errResult = (error: string): Result<number, string> => err(error)
 
 describe("Result", () => {
   it("narrows to the carried value when the ok guard passes", () => {
-    const result: Result<number, string> = ok(42)
+    const result = okResult(42)
 
     expect(isOk(result)).toBe(true)
     expect(isErr(result)).toBe(false)
@@ -12,7 +31,7 @@ describe("Result", () => {
   })
 
   it("narrows to the carried error when the err guard passes", () => {
-    const result: Result<number, string> = err("boom")
+    const result = errResult("boom")
 
     expect(isErr(result)).toBe(true)
     expect(isOk(result)).toBe(false)
@@ -20,46 +39,41 @@ describe("Result", () => {
   })
 
   it("maps the value of an ok", () => {
-    const result: Result<number, string> = ok(2)
-
-    expect(map(result, (n) => n * 10)).toEqual(ok(20))
+    expect(map(okResult(2), (n) => n * 10)).toEqual(ok(20))
   })
 
   it("passes an err through map untouched", () => {
-    const result: Result<number, string> = err("boom")
-
-    expect(map(result, (n) => n * 10)).toEqual(err("boom"))
+    expect(map(errResult("boom"), (n) => n * 10)).toEqual(err("boom"))
   })
 
   it("does not call the mapping function on an err", () => {
-    const transform = jest.fn()
+    // A counter rather than `jest.fn()`: the suite runs as ESM, where the
+    // `jest` global is absent and would have to be imported.
+    let calls = 0
 
-    map(err("boom") as Result<number, string>, transform)
+    map(errResult("boom"), (n) => {
+      calls += 1
+      return n
+    })
 
-    expect(transform).not.toHaveBeenCalled()
+    expect(calls).toBe(0)
   })
 
   it("maps the error of an err", () => {
-    const result: Result<number, string> = err("boom")
-
-    expect(mapErr(result, (e) => e.toUpperCase())).toEqual(err("BOOM"))
+    expect(mapErr(errResult("boom"), (e) => e.toUpperCase())).toEqual(
+      err("BOOM")
+    )
   })
 
   it("passes an ok through mapErr untouched", () => {
-    const result: Result<number, string> = ok(2)
-
-    expect(mapErr(result, (e) => e.toUpperCase())).toEqual(ok(2))
+    expect(mapErr(okResult(2), (e) => e.toUpperCase())).toEqual(ok(2))
   })
 
   it("unwraps the value of an ok and ignores the fallback", () => {
-    const result: Result<number, string> = ok(2)
-
-    expect(unwrapOr(result, 99)).toBe(2)
+    expect(unwrapOr(okResult(2), 99)).toBe(2)
   })
 
   it("returns the fallback when unwrapping an err", () => {
-    const result: Result<number, string> = err("boom")
-
-    expect(unwrapOr(result, 99)).toBe(99)
+    expect(unwrapOr(errResult("boom"), 99)).toBe(99)
   })
 })

@@ -1,0 +1,10 @@
+packages: []
+
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+  msw: false
+  # @swc/core: Jest's transform (see jest.config.mjs). esbuild: tsx + drizzle-kit.
+  # Both postinstall steps only link a prebuilt native binary.
+  '@swc/core': true
+  esbuild: true

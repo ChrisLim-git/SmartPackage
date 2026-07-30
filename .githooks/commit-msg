@@ -1,0 +1,8 @@
+#!/bin/sh
+# Rejects any commit message carrying AI-tool attribution.
+# A guard beats vigilance: this repo's history is handed to a reviewer unedited.
+if grep -inE 'claude|anthropic|co-authored|generated with|ai[- ]assist' "$1" >/dev/null; then
+  echo "commit-msg: rejected — attribution artifact found in the commit message:" >&2
+  grep -inE 'claude|anthropic|co-authored|generated with|ai[- ]assist' "$1" >&2
+  exit 1
+fi

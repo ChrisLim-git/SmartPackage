@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "postgres: up",
+      "type": "shell",
+      "command": "docker compose up -d --wait",
+      "problemMatcher": []
+    },
+    {
+      "label": "postgres: down",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: watch unit",
+      "type": "shell",
+      "command": "pnpm test:watch",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

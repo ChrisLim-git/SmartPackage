@@ -96,9 +96,19 @@ export class StorePackageService {
 
     return uow.run<Result<StoredPackage, StorePackageFailure>>(
       async ({ lockers, packages, customers }) => {
-        // The locker is claimed first, before the recipient exists, because it is
-        // the only contended resource here: failing fast on it means a store that
-        // cannot happen leaves nothing behind, not even a customer row.
+        // The claim is inside this transaction on purpose, and it is the one place
+        // that decision is visible: claiming a locker and recording the parcel in
+        // it commit together, or neither does. Claim-then-commit-then-insert would
+        // leave a locker marked occupied with nothing inside it the first time an
+        // insert failed, and nothing to release it — a dead locker and a parcel
+        // the system never heard of. The row lock is held across two indexed
+        // single-row writes, and `SKIP LOCKED` means a concurrent agent takes the
+        // next locker rather than waiting behind this one.
+        //
+        // The locker comes first within the transaction, before the recipient
+        // exists, because it is the only contended resource: failing fast on it
+        // means a store that cannot happen leaves nothing behind, not even a
+        // customer row.
         const locker = await lockers.claimSmallestFitting(
           command.stationId,
           size.value,

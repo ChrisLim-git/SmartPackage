@@ -147,7 +147,14 @@ There is no `Notifier`. Notification is out of scope, and an interface with a lo
 
 **`Locker` is the consistency boundary, and its invariant is: at most one package occupies a locker at any time.** It is the only thing concurrency can break.
 
-That shapes the code. Allocation is **one atomic conditional `UPDATE … RETURNING`** inside the repository, not a read followed by a write in the calling service — which is why `claimSmallestFitting(stationId, size)` is a repository method with a business-sounding name rather than a `find` plus a `save`. The read-then-write version passes single-threaded tests and double-books under load: measured at 10 of 12 concurrent requests against real Postgres.
+That shapes the code. Allocation is **one atomic conditional `UPDATE … RETURNING`** inside the repository, not a read followed by a write in the calling service — which is why `claimSmallestFitting(stationId, size)` is a repository method with a business-sounding name rather than a `find` plus a `save`. The read-then-write version passes single-threaded tests and double-books under load. Measured here, on this schema, with twenty concurrent stores against a station holding three large lockers:
+
+| Claim                                         | Succeeded    | Lockers used | Parcels behind an occupied door |
+| --------------------------------------------- | ------------ | ------------ | ------------------------------- |
+| read-then-write                               | **20 of 20** | 3            | **17**                          |
+| atomic `UPDATE … FOR UPDATE OF l SKIP LOCKED` | **3 of 20**  | 3            | **0**                           |
+
+The seventeen losers are told `NoSuitableLockerAvailable`, which from where the agent is standing is the truth: the station has nothing free.
 
 State machines are deliberately tiny, and illegal transitions return errors rather than throwing. `Locker` is `available ⇄ occupied`. `Package` is `stored → retrieved`, terminal — so retrieving twice fails, which is the code-replay edge case.
 
@@ -196,7 +203,9 @@ Tests are co-located (`foo.ts` → `foo.test.ts`) and named as behaviour, not me
 
 Flow tests attach to the **repository interface** with in-memory fakes rather than to a database. Because those interfaces are declared in the domain, storing and retrieving a package are domain services and are tested exactly like a fee calculation — no database, no HTTP. That is what keeps `test:unit` sub-second.
 
-The concurrency test is **watched failing against a naive implementation before it is trusted** — a contention test that passes against broken code is worse than no test. It also has to run on real Postgres: PGlite serialises every transaction through a single WASM backend, so `SKIP LOCKED` never actually skips and the test would go green against a genuinely broken claim.
+The concurrency test was **watched failing against a naive implementation before it was trusted** — a contention test that passes against broken code is worse than no test. Restoring read-then-write turns 8 of its 10 cases red, and the numbers in the table above are that run. `contention.test.ts` also keeps the comparison permanently: one case drives the read-then-write pattern directly and asserts it hands one locker to several agents, so the atomic claim is measured against the thing it replaced rather than only against itself. That case uses a barrier — every caller finishes reading before any caller writes — because hoping for the interleaving gives a test that passes on a fast machine and fails in CI, and a flaky concurrency test teaches you to ignore a red suite.
+
+It has to run on real Postgres, and through a pool wide enough to matter: twenty requests through the default pool of four is a test of four-way contention and a queue. PGlite is worse than a narrow pool — it serialises every transaction through a single WASM backend, so `SKIP LOCKED` never skips and the suite goes green against a genuinely broken claim.
 
 ## Interface
 

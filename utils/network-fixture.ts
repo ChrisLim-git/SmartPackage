@@ -30,7 +30,14 @@ export const SIZES = [
   { code: "L", rank: 3, label: "Large" },
 ]
 
-export const seedNetwork = async (pool: Pool, db: Db): Promise<Network> => {
+/** How many lockers of each size, defaulting to one apiece. */
+export type LockerCounts = Partial<Record<string, number>>
+
+export const seedNetwork = async (
+  pool: Pool,
+  db: Db,
+  counts: LockerCounts = { S: 1, M: 1, L: 1 }
+): Promise<Network> => {
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO "user" (name, email, email_verified, created_at, updated_at)
      VALUES ('Ari Agent', 'agent@fixture.test', false, now(), now())
@@ -56,11 +63,15 @@ export const seedNetwork = async (pool: Pool, db: Db): Promise<Network> => {
   const lockerRows = await db
     .insert(locker)
     .values(
-      SIZES.map((size) => ({
-        stationId: site.id,
-        sizeId: sizeIds[size.code],
-        label: `${size.code}1`,
-      }))
+      SIZES.flatMap((size) =>
+        // `S1`, `S2`, … so a label says both what fits and which door it is, and
+        // a contention test can name the three it expects to win.
+        Array.from({ length: counts[size.code] ?? 0 }, (_, index) => ({
+          stationId: site.id,
+          sizeId: sizeIds[size.code],
+          label: `${size.code}${index + 1}`,
+        }))
+      )
     )
     .returning()
   const lockerIds = Object.fromEntries(

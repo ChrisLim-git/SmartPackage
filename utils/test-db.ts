@@ -11,10 +11,13 @@ import * as schema from "@infrastructure/database/schema"
  * open pool that stops the process exiting is a leak worth seeing, and hiding
  * it means later hiding a real one.
  */
-export const createTestDb = () => {
+export const createTestDb = ({ max = 4 }: { max?: number } = {}) => {
+  // `max` is the ceiling on how many transactions can genuinely overlap: a
+  // contention test firing twenty requests through a pool of four is a test of
+  // four-way contention and a queue. It asks for twenty.
   const pool = new Pool({
     connectionString: process.env.TEST_DATABASE_URL,
-    max: 4,
+    max,
   })
 
   // The schema is passed so this db is the same *type* as the application's,

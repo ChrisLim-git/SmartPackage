@@ -1,0 +1,28 @@
+#!/bin/sh
+# The expensive gate. Deliberately here rather than in pre-commit: one commit per
+# red/green cycle means dozens of commits, and a 15-second hook on each would cost
+# real minutes. Nothing broken reaches the remote either way.
+
+fail() {
+  echo "" >&2
+  echo "pre-push: $1" >&2
+  exit 1
+}
+
+echo "pre-push: auditing history for attribution..."
+if git log --format='%an <%ae>%n%B' |
+  grep -inE 'claude|anthropic|copilot|chatgpt|gpt-[0-9]|co-authored|generated with|ai[- ]assist'; then
+  fail "the lines above are in the commit history. Fix before pushing."
+fi
+
+for check in format:check lint typecheck test; do
+  echo "pre-push: pnpm $check"
+  pnpm "$check" >/tmp/pre-push-$$.log 2>&1 || {
+    tail -30 /tmp/pre-push-$$.log >&2
+    rm -f /tmp/pre-push-$$.log
+    fail "pnpm $check failed."
+  }
+  rm -f /tmp/pre-push-$$.log
+done
+
+echo "pre-push: clean."

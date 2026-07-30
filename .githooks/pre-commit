@@ -1,0 +1,45 @@
+#!/bin/sh
+# Fast gate — milliseconds, so it can run on every commit of a red/green cycle
+# without eating the build budget. The expensive suite runs in pre-push.
+#
+# Two jobs: keep secrets and planning files out of the history, and keep
+# attribution artifacts out of the content (commit-msg covers the message).
+
+fail() {
+  echo "pre-commit: $1" >&2
+  exit 1
+}
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# 1. Nothing that should never be committed.
+echo "$staged" | grep -qE '(^|/)\.env($|\.)' &&
+  ! echo "$staged" | grep -qE '(^|/)\.env\.example$' &&
+  fail "a .env file is staged. Only .env.example ships."
+
+echo "$staged" | grep -qE '(^|/)node_modules/' && fail "node_modules is staged."
+echo "$staged" | grep -qE '(^|/)PRODUCT\.md$' && fail "PRODUCT.md is planning context, not part of the deliverable."
+echo "$staged" | grep -qE '(^|/)\.claude/' && fail ".claude/ must not be committed."
+echo "$staged" | grep -qiE '\.(pdf|sqlite|db)$' && fail "a binary artifact is staged; check it belongs here."
+
+# 2. Attribution artifacts in the *content*.
+#
+# README.md, AGENTS.md and these hooks are excluded because they legitimately
+# contain the pattern — the README documents the audit command, and the hooks
+# define it. Excluding them is the cost of the audit being self-documenting;
+# every other file is scanned.
+PATTERN='co-authored-by|generated with|ai[- ]assisted|written by (claude|chatgpt|copilot)|claude\.ai|openai\.com'
+for file in $staged; do
+  case "$file" in
+    README.md | AGENTS.md | .githooks/*) continue ;;
+  esac
+  [ -f "$file" ] || continue
+  if git show ":$file" | grep -inE "$PATTERN" >/dev/null 2>&1; then
+    echo "pre-commit: attribution artifact in $file:" >&2
+    git show ":$file" | grep -inE "$PATTERN" >&2
+    exit 1
+  fi
+done
+
+exit 0

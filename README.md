@@ -133,7 +133,15 @@ Route handlers are the HTTP adapter only: parse, validate, map errors to status 
 
 ## Authorship
 
-Every commit is authored by hand. `.githooks/commit-msg` rejects attribution artifacts, and the same check runs over the whole history before pushing:
+Every commit is authored by hand, and three hooks in `.githooks/` enforce it rather than trusting memory:
+
+| Hook         | Cost         | Does                                                                                       |
+| ------------ | ------------ | ------------------------------------------------------------------------------------------ |
+| `commit-msg` | instant      | rejects attribution artifacts in the message                                               |
+| `pre-commit` | milliseconds | blocks `.env`, `node_modules` and planning files; scans staged **content** for attribution |
+| `pre-push`   | ~15s         | audits the whole history, then runs `format:check`, `lint`, `typecheck` and the full suite |
+
+The split is deliberate: one commit per red→green cycle means dozens of commits, so the expensive gate belongs on push, where it runs once. The history audit is also runnable by hand:
 
 ```bash
 git log --format='%an <%ae>%n%B' \

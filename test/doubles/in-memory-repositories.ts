@@ -179,15 +179,32 @@ export class InMemoryPackageRepository implements PackageRepository {
     )
   }
 
-  async save(parcel: Package): Promise<void> {
+  async findStoredByCodeHash(pickupCodeHash: string): Promise<Package | null> {
+    return (
+      this.parcels.find(
+        (parcel) =>
+          parcel.pickupCodeHash === pickupCodeHash && parcel.status === "stored"
+      ) ?? null
+    )
+  }
+
+  async save(parcel: Package): Promise<boolean> {
     const existing = this.parcels.findIndex((held) => held.id === parcel.id)
 
-    if (existing === -1) {
-      this.parcels.push(parcel)
-      return
+    if (existing !== -1) {
+      this.parcels[existing] = parcel
+      return true
     }
 
-    this.parcels[existing] = parcel
+    // The same rule the partial unique index enforces in Postgres, so the retry
+    // in `StorePackageService` is exercised here rather than only in production.
+    if ((await this.findStoredByCodeHash(parcel.pickupCodeHash)) !== null) {
+      return false
+    }
+
+    this.parcels.push(parcel)
+
+    return true
   }
 
   async findByCustomerId(customerId: string): Promise<Package[]> {

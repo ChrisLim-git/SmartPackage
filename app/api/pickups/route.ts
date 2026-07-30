@@ -5,15 +5,18 @@ import { toCollectedPackageDto } from "@dtos/package"
 import { isErr } from "@domain/shared/result"
 import { collectPackage } from "@infrastructure/container"
 
+/**
+ * The code, and nothing else.
+ *
+ * No station and no locker number: the recipient has six digits from a message,
+ * and the code identifies the parcel on its own — which is what a partial unique
+ * index on the hash of a stored parcel's code guarantees.
+ *
+ * The shape of the code is checked by the domain rather than here. `PickupCode`
+ * owns "six digits", and a second definition in a Zod schema is a rule that can
+ * drift.
+ */
 const pickupSchema = z.object({
-  stationId: z.uuid("stationId must be a uuid"),
-  lockerLabel: z
-    .string("a locker label is required")
-    .trim()
-    .min(1, "a locker label is required"),
-  // Shape is checked by the domain, not here: `PickupCode` owns "six digits",
-  // and duplicating the rule in a Zod schema would leave two definitions of a
-  // valid code that could drift apart.
   pickupCode: z.string("a pickup code is required").trim(),
 })
 

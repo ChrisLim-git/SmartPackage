@@ -54,12 +54,12 @@ const RESPONSES: Record<
   InvalidPickupRequest: {
     status: 404,
     code: "InvalidPickupRequest",
-    message: "We couldn't match that locker and pickup code.",
+    message: "That code does not match a package waiting to be collected.",
   },
   PackageAlreadyRetrieved: {
     status: 404,
     code: "InvalidPickupRequest",
-    message: "We couldn't match that locker and pickup code.",
+    message: "That code does not match a package waiting to be collected.",
   },
   MalformedInput: {
     status: 400,

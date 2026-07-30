@@ -212,6 +212,24 @@ describe("storing a package", () => {
     expect(first.value.pickupCode).not.toBe(second.value.pickupCode)
   })
 
+  it("takes another code when the one it generated is already in use", async () => {
+    const { service } = setup({
+      lockers: [free(small, "S1"), free(small, "S2")],
+      // The generator hands out the same code twice before moving on, which is
+      // what a collision looks like from in here.
+      codes: ["402913", "402913", "581274"],
+    })
+
+    const first = await service.execute(command())
+    const second = await service.execute(command())
+
+    // A code is the entire credential on the collect screen, so two parcels
+    // awaiting collection cannot share one — the second store retries rather
+    // than failing the delivery or, worse, issuing a code that opens two doors.
+    expect(isOk(first) && first.value.pickupCode).toBe("402913")
+    expect(isOk(second) && second.value.pickupCode).toBe("581274")
+  })
+
   it("refuses the store when nothing free fits, mutating nothing", async () => {
     const { service, lockers, stored } = setup({
       lockers: [taken(small, "S1"), taken(medium, "M1")],

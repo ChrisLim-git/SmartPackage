@@ -113,7 +113,7 @@ Every interactive component ships **default, hover, focus, active, disabled, loa
 - **Skeletons for loading**, never a spinner centred in content.
 - **Empty states teach the interface** — "No lockers at this station yet. Add one to start accepting packages." Not "No data".
 - One button shape, one form-control vocabulary, one icon style — **Remix Icon** (`@remixicon/react`), which is what the preset installed. Not Lucide. Across all surfaces. If Save looks different in two places, one is wrong.
-- Tap targets ≥44px on field surfaces → `size="lg"`. shadcn's default size is below 44px.
+- Tap targets ≥44px on field surfaces. **`size="lg"` is not enough in this preset** — `radix-mira` is compact (`Input` `h-7`, `Button size="lg"` `h-8`, `SelectTrigger` `h-7`), so the agent and collect screens state a height through `components/field-surface.ts` instead of trusting a variant name. Admin keeps the compact defaults, which is what dense tables want.
 - `--pointer` is set, so buttons show a pointer cursor.
 
 ## Motion

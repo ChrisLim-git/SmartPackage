@@ -1,6 +1,6 @@
 # Smart Package Locker
 
-A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker and a pickup code; the recipient enters the code, learns the fee, and the locker opens.
+A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-digit pickup code; the recipient types that code — nothing else, no account — sees the fee and a QR code, and scans it at the kiosk to open the door.
 
 > **Status: in progress.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication and the master-data admin surface are in place; the store and retrieve flows come next. See [Progress](#progress).
 
@@ -47,6 +47,7 @@ git config core.hooksPath .githooks
 | `pnpm lint`                                                             | Next core-web-vitals **plus** layer boundaries and domain purity          |
 | `pnpm typecheck`, `pnpm format`                                         |                                                                           |
 | `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` |                                                                           |
+| `DATABASE_URL=$TEST_DATABASE_URL pnpm db:migrate`                       | migrates `smartpackage_test` — `db:migrate` alone only touches the dev DB |
 
 A single file, and a single test by name:
 
@@ -193,6 +194,10 @@ Flow tests attach to the **repository interface** with in-memory fakes rather th
 The concurrency test is **watched failing against a naive implementation before it is trusted** — a contention test that passes against broken code is worse than no test. It also has to run on real Postgres: PGlite serialises every transaction through a single WASM backend, so `SKIP LOCKED` never actually skips and the test would go green against a genuinely broken claim.
 
 ## Interface
+
+A role-aware nav sits in the header on every page, so what each role can reach is visible rather than something a reviewer has to guess at from URLs. It decides only what is _offered_ — every destination is still guarded server-side, and a customer typing `/admin` is bounced.
+
+**Collection asks for the code and nothing else.** No station, no locker number, no sign-in: the recipient has six digits from a message and is standing in front of the doors. That is only safe because no two parcels awaiting collection can share a code — a partial unique index on the hash of a stored parcel's code, and a store that retries with a new code when it loses that race. Collecting is recorded on submit (parcel collected, locker released, in one transaction); the QR code that follows carries `smartpackage://unlock?locker=…&package=…` for the kiosk to read. Physically opening a door is out of scope, and the QR is where this system's responsibility ends.
 
 Three surfaces, and not the same shape, because their users are not in the same place. `/agent/store` and `/collect` are 375px-first — single column, large controls, one bottom-anchored action — because an agent is standing at a wall of lockers holding a package, and a recipient is holding a phone and a message. `/admin` is 1280px-first with dense tables, because an admin is at a desk. Visual system in [DESIGN.md](./DESIGN.md).
 

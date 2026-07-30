@@ -1,9 +1,11 @@
+import { sql } from "drizzle-orm"
 import {
   numeric,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
 
@@ -43,28 +45,50 @@ export const packageStatus = pgEnum("package_status", PACKAGE_STATUSES)
  * There is no `retrieved_by`, and the asymmetry is the point: collection needs
  * no account at all, only the code.
  */
-export const packageTable = pgTable("package", {
-  id: primaryId(),
-  customerId: uuid("customer_id")
-    .notNull()
-    .references(() => customer.id),
-  sizeId: uuid("size_id")
-    .notNull()
-    .references(() => lockerSize.id),
-  // Kept after collection rather than cleared: which locker held the parcel is
-  // the audit trail, and the locker is freed by its own status, not by this.
-  lockerId: uuid("locker_id")
-    .notNull()
-    .references(() => locker.id),
-  pickupCodeHash: text("pickup_code_hash").notNull(),
-  status: packageStatus("status").notNull().default("stored"),
-  storedAt: timestamp("stored_at", { withTimezone: true }).notNull(),
-  retrievedAt: timestamp("retrieved_at", { withTimezone: true }),
-  // Null until collection: the fee is not known until the stay ends. Same
-  // `numeric(12,2)`, same prohibition on `mode: "number"`.
-  feeCharged: numeric("fee_charged", { precision: 12, scale: 2 }),
-  storedBy: uuid("stored_by")
-    .notNull()
-    .references(() => user.id),
-  ...auditColumns,
-})
+export const packageTable = pgTable(
+  "package",
+  {
+    id: primaryId(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customer.id),
+    sizeId: uuid("size_id")
+      .notNull()
+      .references(() => lockerSize.id),
+    // Kept after collection rather than cleared: which locker held the parcel is
+    // the audit trail, and the locker is freed by its own status, not by this.
+    lockerId: uuid("locker_id")
+      .notNull()
+      .references(() => locker.id),
+    pickupCodeHash: text("pickup_code_hash").notNull(),
+    status: packageStatus("status").notNull().default("stored"),
+    storedAt: timestamp("stored_at", { withTimezone: true }).notNull(),
+    retrievedAt: timestamp("retrieved_at", { withTimezone: true }),
+    // Null until collection: the fee is not known until the stay ends. Same
+    // `numeric(12,2)`, same prohibition on `mode: "number"`.
+    feeCharged: numeric("fee_charged", { precision: 12, scale: 2 }),
+    storedBy: uuid("stored_by")
+      .notNull()
+      .references(() => user.id),
+    ...auditColumns,
+  },
+  (table) => [
+    // A code identifies a parcel on its own — the recipient types six digits and
+    // nothing else — so two stored parcels sharing one would mean a code that
+    // opens whichever locker the query happened to return first.
+    //
+    // Partial, because the constraint is only about parcels still in a locker: a
+    // collected parcel keeps its hash for the audit trail, and reusing that code
+    // years later is fine. Postgres will not infer a partial index in
+    // `ON CONFLICT`, so every upsert against it repeats this predicate in
+    // `targetWhere`.
+    //
+    // Written as raw SQL rather than `eq(table.status, "stored")`: the builder
+    // turns a literal into a bound parameter, and drizzle-kit then emits
+    // `WHERE status = $1` into the migration — which Postgres rejects, since DDL
+    // takes no parameters.
+    uniqueIndex("package_stored_pickup_code_unique")
+      .on(table.pickupCodeHash)
+      .where(sql`status = 'stored' AND deleted_at IS NULL`),
+  ]
+)

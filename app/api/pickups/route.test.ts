@@ -9,7 +9,8 @@ const { pool, db } = createTestDb()
  *
  * The session lookup is stubbed for the *store* that sets each test up, not for
  * the collection: the collection is the public path and sends no cookie at all,
- * which is the thing worth proving here.
+ * which is the thing worth proving here. The request body is one field, because
+ * the code identifies the parcel by itself.
  */
 const currentSession: { value: unknown } = { value: null }
 
@@ -95,80 +96,47 @@ describe("POST /api/pickups", () => {
     // one would make a first delivery uncollectable.
     currentSession.value = null
 
-    const response = await POST(request({ stationId, lockerLabel, pickupCode }))
+    const response = await POST(request({ pickupCode }))
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({
       // A same-day collection is one chargeable day at the base rate, as a fixed
       // two-decimal string: a float here is the money rule broken at the edge.
       fee: "2.00",
+      chargeableDays: 1,
+      // The locker comes back from the code, which is the whole point: nobody
+      // told the endpoint where the parcel was.
+      lockerLabel,
       packageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       retrievedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      unlockUri: expect.stringContaining("smartpackage://unlock"),
     })
   })
 
-  it("answers a wrong code with 404", async () => {
-    const { lockerLabel } = await storeOne()
+  it("answers a code no parcel is waiting under with 404", async () => {
+    await storeOne()
 
-    const response = await POST(
-      request({ stationId, lockerLabel, pickupCode: "999999" })
-    )
-
-    expect(response.status).toBe(404)
+    expect((await POST(request({ pickupCode: "999999" }))).status).toBe(404)
   })
 
-  it("answers a replayed code exactly as it answers a wrong one", async () => {
-    const { lockerLabel, pickupCode } = await storeOne()
-    await POST(request({ stationId, lockerLabel, pickupCode }))
-
-    const replayed = await read(
-      await POST(request({ stationId, lockerLabel, pickupCode }))
-    )
-    const wrong = await read(
-      await POST(request({ stationId, lockerLabel, pickupCode: "999999" }))
-    )
-
-    // Byte-identical. A distinguishable "already collected" tells someone with a
-    // wrong code which lockers recently held a parcel, and confirms a correct
-    // code after the fact.
-    expect(replayed).toEqual(wrong)
-  })
-
-  it("answers an unknown locker exactly the same way too", async () => {
+  it("answers a replayed code exactly as it answers an unknown one", async () => {
     const { pickupCode } = await storeOne()
+    await POST(request({ pickupCode }))
 
-    const unknown = await read(
-      await POST(request({ stationId, lockerLabel: "Z9", pickupCode }))
-    )
-    const wrong = await read(
-      await POST(
-        request({ stationId, lockerLabel: "S1", pickupCode: "999999" })
-      )
-    )
+    const replayed = await read(await POST(request({ pickupCode })))
+    const unknown = await read(await POST(request({ pickupCode: "999999" })))
 
-    expect(unknown).toEqual(wrong)
+    // Byte-identical. A distinguishable "already collected" lets someone dialling
+    // codes learn which ones were real, and confirm one after the parcel is gone.
+    expect(replayed).toEqual(unknown)
   })
 
   it("answers 400 for a code that is not six digits", async () => {
-    const { lockerLabel } = await storeOne()
-
-    const response = await POST(
-      request({ stationId, lockerLabel, pickupCode: "abc" })
-    )
+    const response = await POST(request({ pickupCode: "abc" }))
 
     // Malformed, not invalid: the shape is wrong, the caller can fix it, and
-    // saying so reveals nothing about the estate.
+    // saying so reveals nothing about which codes are live.
     expect(response.status).toBe(400)
     expect((await response.json()).error.message).toMatch(/six digits/)
-  })
-
-  it("answers 400 for a station id that is not a uuid", async () => {
-    const response = await POST(
-      request({ stationId: "central", lockerLabel: "S1", pickupCode: "402913" })
-    )
-
-    // Otherwise Postgres answers "invalid input syntax" and a caller's typo
-    // surfaces as a 500 — the server reporting a fault it does not have.
-    expect(response.status).toBe(400)
   })
 })

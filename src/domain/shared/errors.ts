@@ -31,8 +31,8 @@ export type LockerNotOccupied = {
 }
 
 /**
- * The single code for all five of the specification's invalid-pickup
- * scenarios. It carries no context on purpose — see `invalidPickupRequest`.
+ * The single code for every invalid-pickup scenario the specification leaves
+ * unenumerated. It carries no context on purpose — see `invalidPickupRequest`.
  */
 export type InvalidPickupRequest = {
   readonly code: "InvalidPickupRequest"
@@ -102,15 +102,14 @@ export const lockerNotOccupied = (lockerId: string): LockerNotOccupied => ({
 })
 
 /**
- * Takes no arguments, and that is the point. Unknown locker, wrong code, empty
- * locker and already-collected all produce this one error, because a caller
- * who can tell them apart can map out which locker labels are real and which
- * hold a package.
+ * Takes no arguments, and that is the point. A code that never existed, a wrong
+ * code and a code whose parcel has already gone all produce this one error,
+ * because a caller who can tell them apart can dial digits and learn which codes
+ * are live.
  */
 export const invalidPickupRequest = (): InvalidPickupRequest => ({
   code: "InvalidPickupRequest",
-  message:
-    "That locker and pickup code do not match a package awaiting collection.",
+  message: "That pickup code does not match a package awaiting collection.",
 })
 
 /**

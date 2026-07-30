@@ -16,17 +16,25 @@ import { StorageDuration } from "../utils/storage-duration"
 import type { StorageFeeService } from "./storage-fee-service"
 
 export type RetrievePackageCommand = {
-  readonly stationId: string
-  /** What is written on the locker door, which is only unique at one station. */
-  readonly lockerLabel: string
+  /**
+   * Six digits, and the whole request.
+   *
+   * The recipient has a code in a message and nothing else — no account, no
+   * station, no locker number — so the code has to identify the parcel by itself.
+   * Asking for the locker number as well would mean a person standing in front of
+   * a wall of doors transcribing one before anything can happen.
+   */
   readonly pickupCode: string
   readonly audit: AuditContext
 }
 
 export type RetrievedPackage = {
   readonly packageId: string
+  readonly lockerLabel: string
   readonly fee: Money
   readonly retrievedAt: Date
+  readonly storedAt: Date
+  readonly chargeableDays: number
 }
 
 export type RetrievePackageDependencies = {
@@ -44,14 +52,11 @@ export type RetrievePackageFailure =
  * Levels 2 and 3, orchestrated: a code opens one locker, once, and the stay is
  * priced on the way out.
  *
- * Four separate things can be wrong with a collection — the label, the code, the
- * pairing of the two, and whether anything is in there — and all four answer
- * `InvalidPickupRequest`, with no detail attached. A caller able to tell them
- * apart could walk the label space and learn which lockers exist and which hold
- * a parcel, which is a map of what is worth breaking into.
- *
- * A malformed code is the one exception, because the shape of the input is
- * something the person already knows: it says nothing about the estate.
+ * Two things can be wrong with a collection — the code is not a code, or it does
+ * not match a parcel awaiting collection — and only the first is described back.
+ * A wrong code, a code for a parcel already collected, and a code that never
+ * existed are one answer carrying no detail, because a caller able to tell them
+ * apart could learn which codes are live.
  */
 export class RetrievePackageService {
   constructor(private readonly dependencies: RetrievePackageDependencies) {}
@@ -72,29 +77,27 @@ export class RetrievePackageService {
 
     return uow.run<Result<RetrievedPackage, RetrievePackageFailure>>(
       async ({ lockers, packages }) => {
-        const locker = await lockers.findByLabel(
-          command.stationId,
-          command.lockerLabel
+        // By hash, because the plaintext is never stored — the same HMAC that
+        // wrote the column reads it back. Scoped to a stored parcel, which is
+        // what makes a replayed code indistinguishable from a wrong one.
+        const parcel = await packages.findStoredByCodeHash(
+          hasher.hash(code.value)
         )
 
-        if (locker === null) {
-          return err(invalidPickupRequest())
-        }
-
-        const parcel = await packages.findStoredByLockerId(locker.id)
-
-        // Scoped to a stored parcel, which is what makes a replayed code
-        // indistinguishable from a wrong one: once collected, the package is no
-        // longer in the locker as far as this query is concerned.
         if (parcel === null) {
           return err(invalidPickupRequest())
         }
 
-        if (
-          !parcel.verifyCode(code.value, hasher) ||
-          !parcel.matchesLocker(locker.id)
-        ) {
-          return err(invalidPickupRequest())
+        const locker = await lockers.findById(parcel.lockerId)
+
+        if (locker === null) {
+          // A stored parcel always has a locker — the foreign key says so.
+          // Reaching here means the locker was soft-deleted underneath a stored
+          // parcel, which is a data problem rather than a bad request, and
+          // answering anything else would be inventing a state.
+          throw new Error(
+            `package ${parcel.id} is in locker ${parcel.lockerId}, which no longer exists`
+          )
         }
 
         const retrievedAt = clock.now()
@@ -110,19 +113,25 @@ export class RetrievePackageService {
           return err(collected.error)
         }
 
-        // The locker first, then the parcel. Both writes are in one
-        // transaction, so the order cannot change what commits — but it does
-        // decide what a failure leaves behind for anything that is not
-        // transactional, and a parcel recorded as collected behind a locker
-        // that is still occupied is the worst state this system can reach: the
-        // locker is dead and the package is gone from the system.
+        // The locker first, then the parcel. Both writes are in one transaction,
+        // so the order cannot change what commits — but it does decide what a
+        // failure leaves behind for anything that is not transactional, and a
+        // parcel recorded as collected behind a locker that is still occupied is
+        // the worst state this system can reach: the locker is dead and the
+        // package is gone from the system.
         await lockers.release(locker.id, command.audit)
         await packages.save(collected.value, command.audit)
 
         return ok({
           packageId: collected.value.id,
+          lockerLabel: locker.label,
           fee,
           retrievedAt,
+          storedAt: parcel.storedAt,
+          // Returned rather than left to whoever displays it: the fee is
+          // explained to the customer in days, and two implementations of "how
+          // many days is that" would eventually disagree with the invoice.
+          chargeableDays: duration.value.chargeableDays,
         })
       }
     )

@@ -61,6 +61,9 @@ export type StorePackageDependencies = {
   readonly uow: UnitOfWork
 }
 
+/** Enough that exhausting them means a broken generator, not bad luck. */
+const CODE_ATTEMPTS = 5
+
 export type StorePackageFailure =
   StationNotFound | NoSuitableLockerAvailable | MalformedInput
 
@@ -111,35 +114,51 @@ export class StorePackageService {
           command.audit
         )
 
-        const code = codes.generate()
+        // A code is the entire credential — the recipient types six digits and
+        // nothing else — so no two parcels awaiting collection may share one. The
+        // database refuses the duplicate; this loop is what turns that refusal
+        // into another code rather than a failed delivery. A million codes and a
+        // handful of occupied lockers make a second attempt vanishingly rare and
+        // a third rarer still.
+        for (let attempt = 1; attempt <= CODE_ATTEMPTS; attempt += 1) {
+          const code = codes.generate()
 
-        const parcel = Package.store({
-          id: ids.next(),
-          customerId: recipient.id,
-          size: size.value,
-          lockerId: locker.id,
-          code,
-          hasher,
-          clock,
-        })
+          const parcel = Package.store({
+            id: ids.next(),
+            customerId: recipient.id,
+            size: size.value,
+            lockerId: locker.id,
+            code,
+            hasher,
+            clock,
+          })
 
-        if (isErr(parcel)) {
-          // Unreachable: every field it validates was produced above. A throw
-          // rather than an `Err` because this would be a bug in this service,
-          // and because it rolls the claim back instead of committing a locker
-          // holding nothing.
-          throw new Error(
-            `a stored package could not be built: ${parcel.error.message}`
-          )
+          if (isErr(parcel)) {
+            // Unreachable: every field it validates was produced above. A throw
+            // rather than an `Err` because this would be a bug in this service,
+            // and because it rolls the claim back instead of committing a locker
+            // holding nothing.
+            throw new Error(
+              `a stored package could not be built: ${parcel.error.message}`
+            )
+          }
+
+          if (await packages.save(parcel.value, command.audit)) {
+            return ok({
+              lockerLabel: locker.label,
+              pickupCode: code.toString(),
+              storedAt: parcel.value.storedAt,
+            })
+          }
         }
 
-        await packages.save(parcel.value, command.audit)
-
-        return ok({
-          lockerLabel: locker.label,
-          pickupCode: code.toString(),
-          storedAt: parcel.value.storedAt,
-        })
+        // Every attempt collided. With a million codes that means either the
+        // generator has stopped being random or the network is holding most of
+        // the code space — both are faults, and neither is something the agent
+        // can act on.
+        throw new Error(
+          `could not find an unused pickup code in ${CODE_ATTEMPTS} attempts`
+        )
       }
     )
   }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "package_stored_pickup_code_unique" ON "package" USING btree ("pickup_code_hash") WHERE status = 'stored' AND deleted_at IS NULL;

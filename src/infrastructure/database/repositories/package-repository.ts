@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 
 import { Package } from "@domain/entities/package"
 import type { AuditContext } from "@domain/interfaces/audit-context"
@@ -99,6 +99,27 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
     return row === undefined ? null : this.toEntity(row)
   }
 
+  /**
+   * The parcel a code opens, found by the hash of that code.
+   *
+   * Scoped to `stored` and to the same predicate as the partial unique index, so
+   * exactly one row can ever match: a collected parcel keeps its hash for the
+   * audit trail and stops answering to it.
+   */
+  async findStoredByCodeHash(pickupCodeHash: string): Promise<Package | null> {
+    const [row] = await this.selectPackages()
+      .where(
+        and(
+          eq(packageTable.pickupCodeHash, pickupCodeHash),
+          eq(packageTable.status, "stored"),
+          this.visible
+        )
+      )
+      .limit(1)
+
+    return row === undefined ? null : this.toEntity(row)
+  }
+
   async findByCustomerId(customerId: string): Promise<Package[]> {
     const rows = await this.selectPackages()
       .where(and(eq(packageTable.customerId, customerId), this.visible))
@@ -109,7 +130,7 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
     return rows.map((row) => this.toEntity(row))
   }
 
-  async save(parcel: Package, actor: AuditContext): Promise<void> {
+  async save(parcel: Package, actor: AuditContext): Promise<boolean> {
     const [existing] = await this.query
       .select({ id: packageTable.id })
       .from(packageTable)
@@ -130,7 +151,7 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
         })
         .where(eq(packageTable.id, parcel.id))
 
-      return
+      return true
     }
 
     if (actor.actingUserId === null) {
@@ -153,18 +174,35 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
       throw new Error(`no locker size is coded "${parcel.size.code}"`)
     }
 
-    await this.query.insert(packageTable).values({
-      id: parcel.id,
-      customerId: parcel.customerId,
-      sizeId: size.id,
-      lockerId: parcel.lockerId,
-      pickupCodeHash: parcel.pickupCodeHash,
-      status: parcel.status,
-      storedAt: parcel.storedAt,
-      retrievedAt: parcel.retrievedAt,
-      feeCharged: parcel.feeCharged?.toDecimalString() ?? null,
-      storedBy: actor.actingUserId,
-      ...this.stamp(actor),
-    })
+    // `onConflictDoNothing` rather than catching a Postgres error code: the
+    // partial unique index is the thing that decides, and reading its verdict
+    // from an empty result keeps the driver's error taxonomy out of this class.
+    // The predicate is repeated in `targetWhere` because Postgres will not infer
+    // a partial index from the column alone.
+    const written = await this.query
+      .insert(packageTable)
+      .values({
+        id: parcel.id,
+        customerId: parcel.customerId,
+        sizeId: size.id,
+        lockerId: parcel.lockerId,
+        pickupCodeHash: parcel.pickupCodeHash,
+        status: parcel.status,
+        storedAt: parcel.storedAt,
+        retrievedAt: parcel.retrievedAt,
+        feeCharged: parcel.feeCharged?.toDecimalString() ?? null,
+        storedBy: actor.actingUserId,
+        ...this.stamp(actor),
+      })
+      .onConflictDoNothing({
+        target: packageTable.pickupCodeHash,
+        // Named `where` on this builder and `targetWhere` on
+        // `onConflictDoUpdate`; both mean the index predicate, and Postgres will
+        // not infer a partial index without it.
+        where: sql`status = 'stored' AND deleted_at IS NULL`,
+      })
+      .returning({ id: packageTable.id })
+
+    return written.length > 0
   }
 }

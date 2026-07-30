@@ -1,6 +1,6 @@
 import { uuidv7 } from "uuidv7"
 
-import type { IdGenerator } from "@domain/ports/id-generator"
+import type { IdGenerator } from "@domain/interfaces/id-generator"
 
 /**
  * UUIDv7 ids, generated in the application rather than by the database.

@@ -7,7 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Working in this repo
 
-**Read [README.md](./README.md) first.** It is the single source for the commands, the layer rules, the ports, the locker invariant, the `Result` convention, the data rules, the test strategy and the commit format. Do not restate any of it here — this file only adds what a reviewer doesn't need but you do.
+**Read [README.md](./README.md) first.** It is the single source for the commands, the layer rules, the interfaces, the locker invariant, the `Result` convention, the data rules, the test strategy and the commit format. Do not restate any of it here — this file only adds what a reviewer doesn't need but you do.
 
 Read [DESIGN.md](./DESIGN.md) before touching UI.
 
@@ -18,6 +18,8 @@ Read [DESIGN.md](./DESIGN.md) before touching UI.
 - **`@next/env` is CommonJS.** `drizzle.config.ts` is bundled to CJS by drizzle-kit and uses a _named_ import; `jest.global-setup.mjs` is real ESM and uses a _default_ import. Both are correct. Don't "fix" either.
 - **`boundaries/elements` patterns are bare directories** (`"src/domain"`). `"src/domain/**/*"` leaves files sitting directly in the folder unclassified, and every policy then skips them **without reporting anything**. `boundaries/external` and `mode:` are both deprecated in v7 — external packages are restricted with `no-restricted-imports` instead.
 - **Postgres 18's image mounts at `/var/lib/postgresql`**, not `/var/lib/postgresql/data`. `docker/init-test-db.sql` only runs on first initialisation of the volume; after a schema-breaking change, `docker compose down -v`.
+- **A partial unique index needs its predicate repeated in `ON CONFLICT`.** `uniqueIndex().where(...)` builds a partial index, and Postgres will not infer one from the column alone — `onConflictDoUpdate({ target })` fails with "there is no unique or exclusion constraint matching the ON CONFLICT specification" until you add `targetWhere` with the same predicate.
+- **`SequentialIdGenerator` cannot be used against a `uuid` column.** It emits `customer-0001`, which is a fine readable id in a domain test and invalid input syntax in Postgres. Repository tests use the real `UuidV7Generator`.
 - **Never test concurrency against PGlite** — it serialises transactions, so `SKIP LOCKED` never skips and broken code goes green.
 - **`shadcn add form` writes nothing** in 4.x — it is a file-less registry stub. Forms are `field` + react-hook-form's own `<Controller />`. Any `<Form>/<FormField>` snippet is pre-4.x.
 - **`sonner`, not `toast`** — the base is pinned to `radix`, where `sonner` is the documented toast (`toast("…")`).

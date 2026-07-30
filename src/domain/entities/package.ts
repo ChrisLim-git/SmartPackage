@@ -1,5 +1,5 @@
-import type { Clock } from "../ports/clock"
-import type { PickupCodeHasher } from "../ports/pickup-code-hasher"
+import type { Clock } from "../interfaces/clock"
+import type { PickupCodeHasher } from "../interfaces/pickup-code-hasher"
 import {
   type MalformedInput,
   malformedInput,
@@ -68,7 +68,7 @@ export class Package {
         attributes.lockerId,
         attributes.hasher.hash(attributes.code),
         "stored",
-        // From the port, never `new Date()`: a seven-day stay has to be
+        // From the Clock interface, never `new Date()`: a seven-day stay has to be
         // testable in a millisecond.
         attributes.clock.now(),
         null,

@@ -1,4 +1,4 @@
-import type { Clock } from "@domain/ports/clock"
+import type { Clock } from "@domain/interfaces/clock"
 
 const UNIT_MILLISECONDS: Record<string, number> = {
   s: 1_000,

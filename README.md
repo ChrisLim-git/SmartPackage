@@ -2,7 +2,7 @@
 
 A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker and a pickup code; the recipient enters the code, learns the fee, and the locker opens.
 
-> **Status: in progress.** The scaffold, test harness, architectural enforcement, database and the whole domain core are in place; use cases and the interface come next. See [Progress](#progress).
+> **Status: in progress.** The scaffold, test harness, architectural enforcement, database and the whole domain core are in place; use cases and the user interface come next. See [Progress](#progress).
 
 ## Running it
 
@@ -13,8 +13,21 @@ pnpm install
 cp .env.example .env.local          # then fill it in — see the comments in the file
 docker compose up -d --wait         # Postgres 18
 pnpm db:migrate
+pnpm db:seed                        # three accounts, one per role
 pnpm dev                            # http://localhost:3000
 ```
+
+### Signing in
+
+`pnpm db:seed` creates one account per role, all with the password **`smartpackage`**. Re-running it leaves existing accounts alone.
+
+| Email                        | Role       | Lands on       |
+| ---------------------------- | ---------- | -------------- |
+| `admin@smartpackage.test`    | `admin`    | `/admin`       |
+| `agent@smartpackage.test`    | `agent`    | `/agent/store` |
+| `customer@smartpackage.test` | `customer` | `/`            |
+
+These are demo credentials on a local database, published so a reviewer never has to guess. Roles are **granted, never chosen**: `role` is configured with `input: false`, so a sign-up that posts `role: "admin"` still gets a customer — asserted by a test, and by a request over real HTTP.
 
 Hooks are not cloned, so enable the commit guard once per clone:
 
@@ -47,8 +60,8 @@ pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it 
 Clean architecture, four layers, dependencies pointing inward.
 
 ```
-src/domain/          entities, value objects, policies, ports.   imports NOTHING
-src/application/     use cases, repository ports, DTOs.          imports domain
+src/domain/          entities, value objects, policies, interfaces.   imports NOTHING
+src/application/     use cases, repository interfaces, DTOs.          imports domain
 src/infrastructure/  drizzle, better-auth, clock, generators.    imports domain + application
 src/presentation/    components, hooks.                          imports application (+ domain types)
 app/                 route handlers + pages. Composition root — may wire anything.
@@ -61,15 +74,15 @@ This is not decoration. The load-bearing rules — locker allocation, fee tierin
 
 `src/infrastructure/` sits _below_ the domain and points **up**: `application` declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Drizzle implementation. Neither the domain nor the use cases know Postgres exists.
 
-**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` ports — that is what makes the domain tests both instant and deterministic.
+**The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain` or `src/application`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
 Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
 
-### Ports
+### Interfaces
 
-Every source of non-determinism is a port, which is why the domain tests need no mocking framework:
+Every source of non-determinism is an interface, which is why the domain tests need no mocking framework:
 
-| Port                                                             | Declared in | Real                                            | Test double                               |
+| Interface                                                        | Declared in | Real                                            | Test double                               |
 | ---------------------------------------------------------------- | ----------- | ----------------------------------------------- | ----------------------------------------- |
 | `Clock`                                                          | domain      | `SystemClock`                                   | `FixedClock(instant)`, `AdvanceableClock` |
 | `IdGenerator`                                                    | domain      | `UuidV7Generator`                               | `SequentialIdGenerator`                   |
@@ -77,9 +90,9 @@ Every source of non-determinism is a port, which is why the domain tests need no
 | `PickupCodeHasher`                                               | domain      | `HmacPickupCodeHasher(pepper)`                  | `FakePickupCodeHasher`                    |
 | `LockerFitPolicy` / `LockerSelectionPolicy` / `StorageFeePolicy` | domain      | ordinal fit / smallest-fit-first / tiered daily | pure — no double needed                   |
 | `*Repository`, `UnitOfWork`                                      | application | Drizzle                                         | in-memory fakes                           |
-| `NotificationPort`                                               | application | `LoggingNotifier`                               | `RecordingNotifier`                       |
+| `Notifier`                                                       | application | `LoggingNotifier`                               | `RecordingNotifier`                       |
 
-`NotificationPort` exists to make a boundary that is out of scope _visible_ rather than absent.
+`Notifier` exists to make a boundary that is out of scope _visible_ rather than absent.
 
 ### The invariant everything serves
 
@@ -124,7 +137,7 @@ app/api/**/*.test.ts             route handlers, real Postgres
 
 Tests are co-located (`foo.ts` → `foo.test.ts`) and named as behaviour, not method — `charges a seven-day stay piecewise, at 9x base and not 14x`, not `calculateFee works`. A few files cover a pair that only makes sense together: the two locker policies share `locker-policies.test.ts`, and `FeeTier` is tested through `pricing-config.test.ts`, because a tier is only meaningful inside a validated tier set.
 
-Use-case tests attach to the **repository port** with in-memory fakes rather than to a database. That is what keeps `test:unit` sub-second.
+Use-case tests attach to the **repository interface** with in-memory fakes rather than to a database. That is what keeps `test:unit` sub-second.
 
 The concurrency test is **watched failing against a naive implementation before it is trusted** — a contention test that passes against broken code is worse than no test. It also has to run on real Postgres: PGlite serialises every transaction through a single WASM backend, so `SKIP LOCKED` never actually skips and the test would go green against a genuinely broken claim.
 

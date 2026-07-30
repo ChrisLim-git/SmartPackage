@@ -1,4 +1,4 @@
-import type { PickupCode } from "../value-objects/pickup-code"
+import type { PickupCode } from "../utils/pickup-code"
 
 /**
  * Where new pickup codes come from.

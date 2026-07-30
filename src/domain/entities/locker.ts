@@ -1,4 +1,4 @@
-import type { LockerFitPolicy } from "../policies/locker-fit-policy"
+import type { LockerFitService } from "../services/locker-fit-service"
 import {
   type LockerAlreadyOccupied,
   lockerAlreadyOccupied,
@@ -8,7 +8,7 @@ import {
   malformedInput,
 } from "../shared/errors"
 import { err, isErr, ok, type Result } from "../shared/result"
-import type { LockerSize, PackageSize } from "../value-objects/size"
+import type { LockerSize, PackageSize } from "../utils/size"
 
 export type LockerStatus = "available" | "occupied"
 
@@ -109,12 +109,12 @@ export class Locker {
     return this.status === "available"
   }
 
-  /** Capacity only. Whether the locker is free is a separate question, and the selection policy asks both. */
+  /** Capacity only. Whether the locker is free is a separate question, and the selection service asks both. */
   canAccommodate(
     requirement: PackageSize,
-    fitPolicy: LockerFitPolicy
+    fitService: LockerFitService
   ): boolean {
-    return fitPolicy.fits(this.size, requirement)
+    return fitService.fits(this.size, requirement)
   }
 
   occupy(packageId: string): Result<Locker, LockerAlreadyOccupied> {

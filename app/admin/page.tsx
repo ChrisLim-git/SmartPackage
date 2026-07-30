@@ -2,9 +2,9 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { isErr } from "@domain/shared/result"
-import { auth } from "@infrastructure/auth/auth"
-import { createGuards } from "@infrastructure/auth/guard"
-import { LockerAdmin } from "@presentation/views/locker-admin"
+import { auth } from "@infrastructure/external/auth/auth"
+import { createGuards } from "@infrastructure/external/auth/guard"
+import { LockerAdmin } from "@/components/locker-admin"
 
 const { requireRole } = createGuards(auth)
 

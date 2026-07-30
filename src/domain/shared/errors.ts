@@ -13,7 +13,7 @@ export type DomainErrorCode = DomainError["code"]
 
 export type NoSuitableLockerAvailable = {
   readonly code: "NoSuitableLockerAvailable"
-  /** Null when the failure came from the selection policy, which is never told which station it is looking at. */
+  /** Null when the failure came from the selection service, which is never told which station it is looking at. */
   readonly stationId: string | null
   readonly message: string
 }

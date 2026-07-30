@@ -21,9 +21,8 @@
     "types": ["jest", "@testing-library/jest-dom"],
     "paths": {
       "@domain/*": ["./src/domain/*"],
-      "@application/*": ["./src/application/*"],
       "@infrastructure/*": ["./src/infrastructure/*"],
-      "@presentation/*": ["./src/presentation/*"],
+      "@dtos/*": ["./src/dtos/*"],
       "@/*": ["./*"]
     }
   },

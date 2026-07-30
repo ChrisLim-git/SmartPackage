@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto"
 
 import type { PickupCodeGenerator } from "@domain/interfaces/pickup-code-generator"
-import { PickupCode } from "@domain/value-objects/pickup-code"
+import { PickupCode } from "@domain/utils/pickup-code"
 import { isErr } from "@domain/shared/result"
 
 const CODE_SPACE = 1_000_000

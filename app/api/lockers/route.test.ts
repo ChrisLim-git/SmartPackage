@@ -19,7 +19,7 @@ const { pool, db } = createTestDb()
  */
 const currentSession: { value: unknown } = { value: null }
 
-jest.unstable_mockModule("@infrastructure/auth/auth", () => ({
+jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({
   auth: { api: { getSession: async () => currentSession.value } },
   ROLES: ["admin", "agent", "customer"] as const,
   DEFAULT_ROLE: "customer",
@@ -28,9 +28,10 @@ jest.unstable_mockModule("@infrastructure/auth/auth", () => ({
 // Imported after the mock is registered: an ESM module graph is resolved on
 // import, so a static import here would bind the real `auth` first.
 const { GET, POST } = await import("./route")
-const { pool: appPool } = await import("@infrastructure/db/client")
-const { lockerSize } = await import("@infrastructure/db/schema/locker-size")
-const { station } = await import("@infrastructure/db/schema/station")
+const { pool: appPool } = await import("@infrastructure/database/client")
+const { lockerSize } =
+  await import("@infrastructure/database/schema/locker-size")
+const { station } = await import("@infrastructure/database/schema/station")
 
 /** A uuid, because `created_by` is a uuid column even though it carries no key. */
 const ADMIN_ID = "019fb1ad-d64b-7fe4-bde0-9c4044892047"

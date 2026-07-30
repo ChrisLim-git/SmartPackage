@@ -3,9 +3,9 @@ import { FakePickupCodeHasher } from "@/test/doubles/fake-pickup-code-hasher"
 import { unwrap } from "@/test/support/unwrap"
 
 import { isErr } from "../shared/result"
-import { Money } from "../value-objects/money"
-import { PickupCode } from "../value-objects/pickup-code"
-import { PackageSize } from "../value-objects/size"
+import { Money } from "../utils/money"
+import { PickupCode } from "../utils/pickup-code"
+import { PackageSize } from "../utils/size"
 import { Package } from "./package"
 
 const SMALL = unwrap(PackageSize.create({ code: "S", rank: 1, label: "Small" }))

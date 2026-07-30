@@ -1,4 +1,4 @@
-import type { PickupCode } from "../value-objects/pickup-code"
+import type { PickupCode } from "../utils/pickup-code"
 
 /**
  * Turns a pickup code into the opaque value that is safe to store, and answers

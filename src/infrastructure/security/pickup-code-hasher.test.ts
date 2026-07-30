@@ -1,4 +1,4 @@
-import { PickupCode } from "@domain/value-objects/pickup-code"
+import { PickupCode } from "@domain/utils/pickup-code"
 
 import { HmacPickupCodeHasher } from "./pickup-code-hasher"
 

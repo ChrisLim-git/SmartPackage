@@ -1,5 +1,5 @@
 import type { PickupCodeHasher } from "@domain/interfaces/pickup-code-hasher"
-import type { PickupCode } from "@domain/value-objects/pickup-code"
+import type { PickupCode } from "@domain/utils/pickup-code"
 
 /**
  * Hashing without the crypto — a readable, deterministic stand-in.

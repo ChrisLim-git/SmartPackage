@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
 
-import * as schema from "@infrastructure/db/schema"
+import * as schema from "@infrastructure/database/schema"
 
 /**
  * A connection to `smartpackage_test`, separate from the application pool so a

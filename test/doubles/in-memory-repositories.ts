@@ -1,23 +1,23 @@
-import type { AuditContext } from "@application/interfaces/audit-context"
-import type { CustomerRepository } from "@application/interfaces/customer-repository"
-import type { LockerRepository } from "@application/interfaces/locker-repository"
-import type { PackageRepository } from "@application/interfaces/package-repository"
-import type { PricingRepository } from "@application/interfaces/pricing-repository"
-import type { StationRepository } from "@application/interfaces/station-repository"
+import type { AuditContext } from "@domain/interfaces/audit-context"
+import type { CustomerRepository } from "@domain/interfaces/customer-repository"
+import type { LockerRepository } from "@domain/interfaces/locker-repository"
+import type { PackageRepository } from "@domain/interfaces/package-repository"
+import type { PricingRepository } from "@domain/interfaces/pricing-repository"
+import type { StationRepository } from "@domain/interfaces/station-repository"
 import type {
   TransactionalRepositories,
   UnitOfWork,
-} from "@application/interfaces/unit-of-work"
+} from "@domain/interfaces/unit-of-work"
 import { Customer } from "@domain/entities/customer"
 import { Locker } from "@domain/entities/locker"
 import type { Package } from "@domain/entities/package"
 import type { Station } from "@domain/entities/station"
 import type { IdGenerator } from "@domain/interfaces/id-generator"
-import { OrdinalFitPolicy } from "@domain/policies/ordinal-fit-policy"
-import { SmallestFitFirstPolicy } from "@domain/policies/smallest-fit-first-policy"
+import { OrdinalFitService } from "@domain/services/ordinal-fit-service"
+import { SmallestFitFirstService } from "@domain/services/smallest-fit-first-service"
 import { isErr } from "@domain/shared/result"
-import type { PricingConfig } from "@domain/value-objects/pricing-config"
-import type { LockerSize, PackageSize } from "@domain/value-objects/size"
+import type { PricingConfig } from "@domain/utils/pricing-config"
+import type { LockerSize, PackageSize } from "@domain/utils/size"
 
 /**
  * In-memory repositories, for use-case tests that have no business touching a
@@ -51,8 +51,8 @@ export class InMemoryLockerRepository implements LockerRepository {
    * green — and the fast tests would be confirming a rule the system does not
    * follow.
    */
-  private readonly selection = new SmallestFitFirstPolicy(
-    new OrdinalFitPolicy()
+  private readonly selection = new SmallestFitFirstService(
+    new OrdinalFitService()
   )
 
   constructor(

@@ -7,9 +7,9 @@ import {
   packageAlreadyRetrieved,
 } from "../shared/errors"
 import { err, ok, type Result } from "../shared/result"
-import type { Money } from "../value-objects/money"
-import type { PickupCode } from "../value-objects/pickup-code"
-import type { PackageSize } from "../value-objects/size"
+import type { Money } from "../utils/money"
+import type { PickupCode } from "../utils/pickup-code"
+import type { PackageSize } from "../utils/size"
 
 export type PackageStatus = "stored" | "retrieved"
 

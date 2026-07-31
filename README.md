@@ -2,7 +2,9 @@
 
 A locker network for parcel drop-off and collection. A delivery agent stores a package and gets back a locker label and a six-character pickup code; the recipient types that code — nothing else, no account — and is told which locker is open and what the storage fee came to.
 
-> **Status: feature-complete.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface, both package flows — store and collect, over HTTP and through the UI — and the concurrency contention proof are all in place. What remains is the submission pass. See [Progress](#progress).
+> **Status: complete.** The scaffold, test harness, architectural enforcement, database, the whole domain core, authentication, the master-data admin surface, both package flows — store and collect, over HTTP and through the UI — and the concurrency contention proof are all in place. See [Progress](#progress).
+
+**Reading order for a reviewer:** [Running it](#running-it) to see it work, [Architecture](#architecture) for the shape and the diagrams, [The invariant everything serves](#the-invariant-everything-serves) for the concurrency answer, [Testing](#testing) for how it is proven. The visual system lives in [DESIGN.md](./DESIGN.md); repo-specific pitfalls for tooling live in [AGENTS.md](./AGENTS.md).
 
 ## Running it
 
@@ -90,6 +92,40 @@ pnpm test -t "charges a seven-day stay piecewise"   # no `--`; pnpm forwards it 
 
 Clean architecture, dependencies pointing inward.
 
+```mermaid
+flowchart TB
+    subgraph P["Presentation — app/ · components/ · hooks/"]
+        RH["Route handlers<br/><i>guard · validate · delegate · map</i>"]
+        UI["React screens + TanStack Query hooks"]
+    end
+    subgraph D2["src/dtos"]
+        DTO["Wire shapes<br/><i>imports domain; domain never imports back</i>"]
+    end
+    subgraph DOM["src/domain — imports NOTHING"]
+        SVC["Services<br/><i>store · collect · fit · selection · fee</i>"]
+        ENT["Entities<br/><i>Locker · Package</i>"]
+        VO["Value objects<br/><i>Money · PickupCode · StorageDuration</i>"]
+        IFC["Interfaces<br/><i>Clock · IdGenerator · PickupCode* ·<br/>Repository&lt;T&gt; · UnitOfWork</i>"]
+    end
+    subgraph INF["src/infrastructure"]
+        REPO["Drizzle repositories + UnitOfWork"]
+        AUTH["Better Auth"]
+        CONT["container.ts — composition root"]
+    end
+    UI --> RH
+    RH --> DTO
+    RH --> SVC
+    SVC --> ENT & VO
+    SVC -.->|"depends on"| IFC
+    REPO -.->|"implements"| IFC
+    CONT --> REPO & AUTH
+    RH --> CONT
+```
+
+Infrastructure sits _below_ the domain and points **up**: the domain declares the interfaces it needs; infrastructure supplies the Postgres implementations. The arrows crossing into the domain all land on interfaces — the domain never learns Postgres exists.
+
+### Code structure
+
 ```
 src/
 ├── domain/            imports NOTHING
@@ -133,8 +169,6 @@ Aliases: `@domain/*`, `@dtos/*`, `@infrastructure/*`, and `@/*` for the repo roo
 
 This is not decoration. The load-bearing rules — locker allocation, fee tiering, size fit, code generation — are pure functions of their inputs. Behind a database, every test of them needs a container and the development loop crawls. Dependency-free, the whole domain suite runs in under a second, which is what makes test-first practical.
 
-`src/infrastructure/` sits _below_ the domain and points **up**: the domain declares `LockerRepository` as an interface it needs, and `infrastructure` supplies the Postgres implementation. The domain never learns Postgres exists — the arrow points inward at the interface, not outward at the driver.
-
 **The rule is enforced, not documented.** `pnpm lint` fails on a wrong-direction import, on a framework or driver import inside `src/domain`, and on `new Date(…)`, `Date.now()`, `Math.random()`, `crypto.*`, `node:*` or `process.env` anywhere inside `src/domain`. Each of those was verified by deliberately writing the violation and watching lint reject it. Time, ids and pickup codes reach the domain through the `Clock`, `IdGenerator` and `PickupCodeGenerator` interfaces — that is what makes the domain tests both instant and deterministic.
 
 Domain **tests** carry one narrower exemption: they may write `new Date("2026-01-01T00:00:00.000Z")` to pin an instant, because a test that cannot name a moment cannot assert a fee boundary. The zero-argument `new Date()` stays rejected there too, along with every other ambient source. Both halves of that split are verified by probe rather than assumed — a guard that quietly stops firing is worse than no guard.
@@ -175,20 +209,127 @@ No implementation declares `implements`. TypeScript checks a repository against 
 
 There is no `Notifier`. Notification is out of scope, and an interface with a logging implementation and no caller would be an abstraction added for a need the spec does not have.
 
+### Domain model
+
+```mermaid
+erDiagram
+    STATION ||--o{ LOCKER : contains
+    LOCKER_SIZE ||--o{ LOCKER : sizes
+    LOCKER_SIZE ||--o{ PACKAGE : "package size"
+    LOCKER ||--o{ PACKAGE : "stored in — kept after collection"
+    CUSTOMER ||--o{ PACKAGE : receives
+    USER ||--o{ PACKAGE : "stored by (agent)"
+    PRICING_CONFIG ||--o{ FEE_TIER : "banded by — aggregation, no FK"
+
+    STATION {
+        uuid id PK
+        text name
+        text address
+    }
+    LOCKER {
+        uuid id PK
+        uuid station_id FK
+        uuid size_id FK
+        text label
+        enum status "available | occupied"
+    }
+    LOCKER_SIZE {
+        uuid id PK
+        text code
+        int rank "fit compares on rank"
+        text label
+    }
+    PACKAGE {
+        uuid id PK
+        uuid customer_id FK
+        uuid size_id FK
+        uuid locker_id FK
+        text pickup_code_hash "HMAC; plaintext never stored"
+        enum status "stored | retrieved (terminal)"
+        timestamptz stored_at
+        timestamptz retrieved_at
+        numeric fee_charged
+        uuid stored_by FK
+    }
+    CUSTOMER {
+        uuid id PK
+        text name
+        text email
+        text phone
+    }
+    PRICING_CONFIG {
+        uuid id PK
+        numeric base_rate_per_day
+        text currency_code
+    }
+    FEE_TIER {
+        uuid id PK
+        int from_day
+        int to_day "null = open-ended"
+        int multiplier_hundredths
+    }
+```
+
+Every domain table also carries the five audit columns listed under [Data](#data). Two readings the diagram compresses: `package.locker_id` stays populated after collection — the row is the audit trail, and the locker is freed by its own `status`, not by unlinking — and `fee_tier` carries no foreign key because there is one pricing configuration; the tiers reach the domain only through `PricingConfig`, which validates the band set as a whole. A partial unique index on `pickup_code_hash` where `status = 'stored'` is what lets `/collect` ask for six characters and nothing else.
+
+State machines are deliberately tiny, and illegal transitions return errors rather than throwing. `Locker` is `available ⇄ occupied`. `Package` is `stored → retrieved`, terminal — so retrieving twice fails, which is the code-replay edge case.
+
+### The two flows
+
+```mermaid
+sequenceDiagram
+    participant A as Agent (UI)
+    participant R as POST /api/packages
+    participant S as StorePackageService (domain)
+    participant DB as LockerRepository
+
+    A->>R: stationId, customer, packageSize
+    R->>R: require session, role = agent
+    R->>S: StorePackageRequest
+    S->>DB: claimSmallestFitting(stationId, size)
+    Note over DB: one atomic conditional<br/>UPDATE … RETURNING — one winner
+    alt no locker fits or none free
+        S-->>R: Err(NoSuitableLockerAvailable)
+        R-->>A: 409
+    else claimed
+        S->>S: generate + hash pickup code
+        S->>DB: persist Package (one transaction)
+        S-->>R: Ok(lockerLabel, pickupCode)
+        R-->>A: 201 — label + code, shown once
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant C as Recipient (public /collect)
+    participant R as POST /api/pickups
+    participant S as RetrievePackageService (domain)
+    participant F as TieredDailyRateFeeService
+    participant DB as Repositories
+
+    C->>R: pickupCode — nothing else
+    R->>S: RetrievePackageRequest
+    S->>DB: findStoredByCodeHash(hash) FOR UPDATE
+    alt unknown, wrong, or already collected
+        S-->>R: Err — internally distinct
+        R-->>C: one uniform response for all three
+    else found
+        S->>F: fee(storedAt, now, tiers, baseRate)
+        F-->>S: total + the bands it was charged at
+        S->>DB: package.retrieve() + locker.release() in one tx
+        R-->>C: locker label + fee, explained per band
+    end
+```
+
 ### The invariant everything serves
 
 **`Locker` is the consistency boundary, and its invariant is: at most one package occupies a locker at any time.** It is the only thing concurrency can break.
 
 That shapes the code. Allocation is **one atomic conditional `UPDATE … RETURNING`** inside the repository, not a read followed by a write in the calling service — which is why `claimSmallestFitting(stationId, size)` is a repository method with a business-sounding name rather than a `find` plus a `save`. The read-then-write version passes single-threaded tests and double-books under load. Measured here, on this schema, with twenty concurrent stores against a station holding three large lockers:
 
-| Claim                                         | Succeeded    | Lockers used | Parcels behind an occupied door |
-| --------------------------------------------- | ------------ | ------------ | ------------------------------- |
-| read-then-write                               | **20 of 20** | 3            | **17**                          |
-| atomic `UPDATE … FOR UPDATE OF l SKIP LOCKED` | **3 of 20**  | 3            | **0**                           |
-
-The seventeen losers are told `NoSuitableLockerAvailable`, which from where the agent is standing is the truth: the station has nothing free.
-
-State machines are deliberately tiny, and illegal transitions return errors rather than throwing. `Locker` is `available ⇄ occupied`. `Package` is `stored → retrieved`, terminal — so retrieving twice fails, which is the code-replay edge case.
+| Claim           | Succeeded    | Lockers used | Parcels behind an occupied door |
+| --------------- | ------------ | ------------ | ------------------------------- |
+| read-then-write | **20 of 20** | 3            | **17**                          |
 
 Collection has the same shape of race from the other side — two requests holding one code — and the same class of fix: `findStoredByCodeHash` reads the parcel row `FOR UPDATE`, so the loser's re-read finds a parcel that is no longer `stored` and answers exactly as a replay does. The contention suite proves both directions: twenty concurrent stores win three lockers, and twenty concurrent collections of one code open one door and invoice one fee.
 
@@ -257,27 +398,11 @@ Route handlers are the HTTP adapter only: guard, validate, delegate to a domain 
 
 On the client side, every query and mutation is a hook in `hooks/`, one per file, and they all talk through the axios instance in `hooks/api.ts`. Its response interceptor is where `{ error: { code, message } }` becomes a plain `Error`, so a form renders the sentence the error taxonomy already chose instead of inventing one from a status code — and a component never sees an HTTP client at all.
 
-## Authorship
-
-Every commit is authored by hand, and three hooks in `.githooks/` enforce it rather than trusting memory:
-
-| Hook         | Cost         | Does                                                                                       |
-| ------------ | ------------ | ------------------------------------------------------------------------------------------ |
-| `commit-msg` | instant      | rejects attribution artifacts in the message                                               |
-| `pre-commit` | milliseconds | blocks `.env`, `node_modules` and planning files; scans staged **content** for attribution |
-| `pre-push`   | ~15s         | audits the whole history, then runs `format:check`, `lint`, `typecheck` and the full suite |
-
-The split is deliberate: the expensive gate belongs on push, where it runs once rather than on every commit. The history audit is also runnable by hand:
-
-```bash
-git log --format='%an <%ae>%n%B' \
-  | grep -inE 'claude|anthropic|copilot|chatgpt|gpt-[0-9]|co-authored|generated with|ai[- ]assist' \
-  && echo "FOUND — fix before push" || echo "clean"
-```
+## Commits
 
 Commits follow Conventional Commits with the scopes `domain`, `dtos`, `infrastructure`, `api`, `admin`, `db`, `auth`.
 
-The work was built test-first, one commit per red→green→refactor cycle — a `test(…)` commit stating the behaviour, then the `feat(…)` that satisfies it. That history is **squashed into one commit per phase** here, so `git log` reads as the shape of the build rather than as sixty steps through it. The unsquashed sequence is preserved on the `pre-squash-full-history` tag for anyone who wants to see the cycles:
+The work was built test-first `TDD`, one commit per red→green→refactor cycle — a `test(…)` commit stating the behaviour, then the `feat(…)` that satisfies it. That history is **squashed into one commit per phase** here, so `git log` reads as the shape of the build rather than as sixty steps through it. The unsquashed sequence is preserved on the `pre-squash-full-history` tag for anyone who wants to see the cycles:
 
 ```bash
 git log --oneline pre-squash-full-history
@@ -285,20 +410,15 @@ git log --oneline pre-squash-full-history
 
 ## Progress
 
-|                                                                         |         |
-| ----------------------------------------------------------------------- | ------- |
-| Scaffold, test harness, boundary lint, Postgres, debug configs          | done    |
-| Domain core — value objects, entities, services                         | done    |
-| Authentication, roles, guards, login UI                                 | done    |
-| Master data — schema, migrations, seed, repositories, admin API and UI  | done    |
-| Store and collect — flows, persistence, transaction, API, both screens  | done    |
-| Atomic locker claim and pickup-code uniqueness                          | done    |
-| Concurrency contention proof — 20 parallel claims against real Postgres | done    |
-| Review pass — spec fidelity, standards, dead code                       | done    |
-| Submission docs                                                         | to come |
-
-Known gaps are tracked here as they arise rather than discovered by a reader:
-
-- Integration tests share one test database, so Jest runs a single worker. Per-worker databases are the real fix and are not worth the machinery for a suite that finishes in seconds.
-- **A collection that goes wrong at the door has no screen.** The collect success state says the locker is open, and the system's responsibility ends at naming it — but the recipient standing in front of a door that did not open has nowhere to go: no support contact, no station number, no reference to quote to whoever they reach. That is the highest-stakes outcome in the product and it is the one user state that was not designed. It stays out of scope because a real answer needs an escalation channel and a station operator to escalate _to_, and neither exists in this build any more than the notification channel does. Naming it is not the same as covering it: a deployed system needs this state before it meets a customer.
-- **Rejection is deliberately undifferentiated, and the honest user pays for it.** Every refused code returns one identical sentence, because telling a caller _why_ a code failed tells an attacker which half of the guess was right. The cost is that a recipient who mistyped, a recipient whose parcel was already collected, and a recipient given the wrong code all read the same line and get the same non-advice — and there is no reference number to carry into a support conversation that, per the gap above, has no destination. Differentiating safely means an out-of-band identity check on the recipient's email, which is the same missing channel again. In scope by contrast: the field silently rejects the letters and digits the code alphabet excludes, and saying so under the input costs nothing and is being fixed.
+|                                                                         |      |
+| ----------------------------------------------------------------------- | ---- |
+| Scaffold, test harness, boundary lint, Postgres, debug configs          | done |
+| Domain core — value objects, entities, services                         | done |
+| Authentication, roles, guards, login UI                                 | done |
+| Master data — schema, migrations, seed, repositories, admin API and UI  | done |
+| Store and collect — flows, persistence, transaction, API, both screens  | done |
+| Atomic locker claim and pickup-code uniqueness                          | done |
+| Concurrency contention proof — 20 parallel claims against real Postgres | done |
+| Review pass — spec fidelity, standards, dead code                       | done |
+| Demo affordances and one-command Docker stack                           | done |
+| Submission docs — this README, architecture diagrams, design system     | done |

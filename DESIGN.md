@@ -85,7 +85,7 @@ The preset ships **three** families, not one, and inverts the usual default:
 | `--font-sans`    | Geist              | Loaded and available; opt in with `font-sans`                              |
 
 > [!note] Mono-by-default is the supplied theme, and it is kept
-> This document originally specified one sans family with mono reserved for code/data. The preset decided otherwise, and the preset is the _supplied_ theme — [[T602 Apply supplied shadcn theme|T602]] exists to honour it, not to relitigate it. A monospace operational UI reads as instrument-panel, which suits the register.
+> This document originally specified one sans family with mono reserved for code/data. The preset decided otherwise, and the preset is the _supplied_ theme — the theme ticket exists to honour it, not to relitigate it. A monospace operational UI reads as instrument-panel, which suits the register.
 >
 > The consequence: **mono no longer signals "transcribe this"**, because everything is mono. The pickup code, locker label and fee must earn emphasis through **size, weight and `tracking`** instead — the `display` step below is what carries them.
 

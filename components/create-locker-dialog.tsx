@@ -10,6 +10,7 @@ import type { LockerSizeDto, StationDto } from "@dtos/master-data"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -36,12 +37,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-/**
- * `field` plus react-hook-form's own `<Controller />`.
- *
- * Not `<Form>/<FormField>/<FormMessage>` — `shadcn add form` writes no files in
- * 4.x, and every tutorial showing those components predates it.
- */
+/** `field` + `<Controller />` — `shadcn add form` writes no files in 4.x. */
 export const CreateLockerDialog = ({
   stations,
   sizes,
@@ -73,8 +69,7 @@ export const CreateLockerDialog = ({
       reset()
       setOpen(false)
     } catch (error) {
-      // A duplicate label is a fact about the label, so it is reported on the
-      // label — not thrown at the user as a toast that says "Error".
+      // A duplicate label is a fact about the label, so it is reported there.
       setError("label", {
         message:
           error instanceof Error
@@ -162,6 +157,12 @@ export const CreateLockerDialog = ({
           </div>
 
           <DialogFooter>
+            {/* A named way out, not just Esc and the X. */}
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Adding…" : "Add locker"}
             </Button>

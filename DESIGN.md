@@ -33,9 +33,11 @@ The preset is a **warm taupe neutral with an amber accent**. Light mode is white
 | `--primary`            | `oklch(0.852 0.199 91.936)` | `oklch(0.795 0.184 86.047)`          | **Amber accent.** Primary action only                                                   |
 | `--primary-foreground` | `oklch(0.421 0.095 57.708)` | `oklch(0.421 0.095 57.708)`          | Dark brown ink _on_ amber — amber is a light accent, so its label is dark in both modes |
 | `--muted`              | `oklch(0.96 0.002 17.2)`    | `oklch(0.268 0.011 36.5)`            | Subdued fill                                                                            |
-| `--muted-foreground`   | `oklch(0.547 0.021 43.1)`   | `oklch(0.714 0.014 41.2)`            | Metadata, placeholders                                                                  |
-| `--border`, `--input`  | `oklch(0.922 0.005 34.3)`   | `oklch(1 0 0 / 10%)` · input `/ 15%` | Rules and field edges                                                                   |
-| `--ring`               | `oklch(0.714 0.014 41.2)`   | `oklch(0.547 0.021 43.1)`            | Focus ring — **neutral, not amber**                                                     |
+| `--muted-foreground`   | `oklch(0.52 0.021 43.1)`    | `oklch(0.714 0.014 41.2)`            | Metadata, placeholders. Light darkened from the preset's `0.547` — see below            |
+| `--border`, `--input`  | `oklch(0.922 0.005 34.3)`   | `oklch(1 0 0 / 10%)` · input `/ 15%` | **Decorative rules only** — table borders, dividers. Not form-control edges             |
+| `--field-border`       | `oklch(0.58 0.008 41.2)`    | `oklch(0.56 0.008 41.2)`             | The edge of an input, select or OTP cell. 4.30:1 / 4.23:1 on `--background`             |
+| `--ring`               | `oklch(0.714 0.014 41.2)`   | `oklch(0.547 0.021 43.1)`            | Preset token, **not used for focus** — see below                                        |
+| `--focus`              | `oklch(0.44 0.004 49.3)`    | `oklch(0.76 0.004 49.3)`             | Focus indicator, at full opacity. 7.78:1 / 9.19:1 on `--background`                     |
 | `--destructive`        | `oklch(0.577 0.245 27.325)` | `oklch(0.704 0.191 22.216)`          | Errors                                                                                  |
 | `--sidebar*`           | tinted off-white            | `oklch(0.214 0.009 43.1)`            | Admin chrome; the second neutral layer already exists as tokens                         |
 | `--radius`             | **`0`**                     | —                                    | Every `--radius-*` step derives from it, so **`0` means square corners everywhere**     |
@@ -46,6 +48,24 @@ The preset is a **warm taupe neutral with an amber accent**. Light mode is white
 > - **`--ring` is neutral taupe, not the accent.** Focus is legible without competing with primary actions. Keep it.
 >
 > Amber at `oklch(0.852 …)` is **light** — white text on it fails contrast. Always pair with `--primary-foreground`, never with `--background`.
+
+> [!danger] Three tokens are authored here, not inherited — and this is the exception the "never hand-author colours" rule allows for
+> The preset's own focus and field-edge treatments fail WCAG 2.2 by wide margins, in **both** modes. Measured, composited, not eyeballed:
+>
+> | What the preset shipped                         | Light      | Dark       | Needs |
+> | ----------------------------------------------- | ---------- | ---------- | ----- |
+> | `focus-visible:ring-ring/30` on every control   | **1.28:1** | **1.36:1** | 3:1   |
+> | `outline-ring/50` on `*`                        | **1.53:1** | **1.82:1** | 3:1   |
+> | `border-input` as an OTP cell / input edge      | **1.26:1** | **1.48:1** | 3:1   |
+> | `--muted-foreground` on `--muted` (`FormAlert`) | **4.41:1** | 5.97:1     | 4.5:1 |
+>
+> The failure is structural, not a bad value: `--ring` is only ever _used_ at 30% or 50% alpha, and no lightness for a neutral taupe survives that composite. So focus stops deriving from `--ring` and gets its own solid token used at full opacity, and the boundary of a form control stops sharing a token with a table rule — a divider has no contrast obligation, the edge of the box a stranger has to type into does.
+>
+> `--muted-foreground` is darkened in light mode only, which is the one adjustment the rule below already sanctioned in advance.
+>
+> **A focus ring cannot reach 3:1 against the amber primary in dark mode at any lightness.** It does not need to: `ring-offset-background` keeps the ring on the page surface rather than overlapping the button. Do not remove the offset.
+>
+> The measuring script and the full before/after table live in the audit that produced these values. Change a token here and re-measure; do not eyeball it.
 
 Rules that hold regardless of what the preset supplies:
 

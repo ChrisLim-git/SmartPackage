@@ -8,6 +8,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,12 +28,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 /**
- * Registering a station, so a new location can be brought online without a seed
- * run — which is what the locker dialog beside it has always assumed.
- *
- * No uniqueness check on the name, deliberately: there is no unique index on it,
- * because a name is a label an operator may want to change and a constraint
- * would make renaming one a migration. Two stations may share a name.
+ * No uniqueness check on the name, deliberately — there is no unique index on
+ * it, and two stations may share a name.
  */
 export const CreateStationDialog = ({
   onCreate,
@@ -57,8 +54,7 @@ export const CreateStationDialog = ({
       reset()
       setOpen(false)
     } catch (error) {
-      // Reported on the name, which is the field an operator would revisit —
-      // rather than thrown at them as a toast that says "Error".
+      // Reported on the name, the field an operator would revisit.
       setError("name", {
         message:
           error instanceof Error
@@ -109,6 +105,12 @@ export const CreateStationDialog = ({
           </div>
 
           <DialogFooter>
+            {/* A named way out, not just Esc and the X. */}
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Adding…" : "Add station"}
             </Button>

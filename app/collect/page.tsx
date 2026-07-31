@@ -15,9 +15,12 @@ import { CollectPackageForm } from "@/components/collect-package-form"
  */
 export default function CollectPackagePage() {
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-col gap-6 p-6">
+    // `min-h-svh` with the form growing into it, so "Open locker" sits in thumb
+    // reach at the bottom of the phone rather than halfway up with four hundred
+    // pixels of nothing beneath it.
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col gap-8 p-6">
       <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-2xl">Collect your package</h1>
+        <h1 className="font-heading text-2xl">Collect a package</h1>
         <p className="text-muted-foreground">
           Enter the six-character code you were sent.
         </p>

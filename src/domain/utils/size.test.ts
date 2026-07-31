@@ -8,11 +8,7 @@ const unwrap = <T>(result: Result<T, { message: string }>): T => {
   return result.value
 }
 
-/**
- * The fixtures are built here, not imported from production code. Sizes are
- * master data — rows in `locker_size` — so a hardcoded S/M/L in the domain
- * would be the very coupling this ticket exists to avoid.
- */
+/** Fixtures built here, not imported: sizes are master data rows, not domain constants. */
 const lockerSize = (code: string, rank: number): LockerSize =>
   unwrap(LockerSize.create({ code, rank, label: `${code} locker` }))
 
@@ -92,8 +88,6 @@ describe("Size", () => {
 
   describe("extensibility", () => {
     it("takes a fourth size with no change to production code", () => {
-      // The spec asks for sizes that extend easily. This test is the proof:
-      // XL is added here, in a test, and every comparison keeps working.
       const extraLarge = lockerSize("XL", 4)
 
       expect(extraLarge.isAtLeast(large)).toBe(true)
@@ -108,8 +102,10 @@ describe("Size", () => {
     it("keeps a locker's capacity and a package's requirement apart", () => {
       const requirement = packageSize("M", 2)
 
-      // A compile-time assertion: if these two ever become assignable, the
-      // unused @ts-expect-error becomes an error and `pnpm typecheck` fails.
+      // Compile-time assertion: if these ever become assignable, the unused
+      // suppression below itself fails typecheck. (Do not start that sentence
+      // with the directive name — TypeScript reads any comment beginning with
+      // it as a second directive, which is then unused, which fails the build.)
       // @ts-expect-error a PackageSize is not a LockerSize
       const capacity: LockerSize = requirement
 

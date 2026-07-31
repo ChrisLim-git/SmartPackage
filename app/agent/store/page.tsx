@@ -27,17 +27,20 @@ export default async function StorePackagePage() {
 
   return (
     // 375px-first, like every agent surface: single column, thumb reach.
-    <main className="mx-auto flex w-full max-w-sm flex-col gap-6 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl">Store a package</h1>
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {gate.value.user.email}
-        </p>
-      </div>
-
+    //
+    // `min-h-svh` and a flex child that grows, so the form's submit sits at the
+    // bottom of the viewport rather than wherever the fields happen to end.
+    // DESIGN.md asks for a bottom-anchored primary action on both field surfaces
+    // and only the sign-in page was doing it.
+    //
+    // The heading lives inside the form component rather than here: on success
+    // the result has to *replace* the page title, not appear underneath it, and
+    // a server component cannot know which of the two states is showing.
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col p-6">
       <StorePackageForm
         stations={sites.map(toStationDto)}
         sizes={sizes.map(toLockerSizeDto)}
+        agentEmail={gate.value.user.email}
       />
     </main>
   )

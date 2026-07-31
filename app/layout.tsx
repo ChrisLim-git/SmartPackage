@@ -47,8 +47,12 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <QueryProvider>
-            <SessionBar />
-            {children}
+            {/* `min-h-svh` here, not on the page: on the page it measures from
+                under the bar and overflows by exactly the bar's height. */}
+            <div className="flex min-h-svh flex-col">
+              <SessionBar />
+              {children}
+            </div>
           </QueryProvider>
         </ThemeProvider>
       </body>

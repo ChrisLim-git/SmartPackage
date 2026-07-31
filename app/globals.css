@@ -16,13 +16,28 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.96 0.002 17.2);
-  --muted-foreground: oklch(0.547 0.021 43.1);
+  /* Darkened from the preset's 0.547. At 0.547 this text measures 4.41:1 on
+     --muted, which is where FormAlert puts it — the sentence a refused customer
+     reads, below AA. 0.52 measures 4.94:1 on --muted and 5.55:1 on --background.
+     DESIGN.md sanctions exactly this: "if --muted-foreground fails, it gets
+     darkened rather than accepted". Dark mode already passes and is untouched. */
+  --muted-foreground: oklch(0.52 0.021 43.1);
   --accent: oklch(0.96 0.002 17.2);
   --accent-foreground: oklch(0.214 0.009 43.1);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0.005 34.3);
   --input: oklch(0.922 0.005 34.3);
   --ring: oklch(0.714 0.014 41.2);
+  /* Focus indicator. Deliberately NOT --ring: the preset's ring is only ever
+     applied at 30% or 50% alpha, and those composite to 1.28:1 and 1.53:1 on
+     white — SC 2.4.11 wants 3:1, so the app had no visible focus at all. This is
+     a solid value used at full opacity: 7.78:1 on --background, 6.92:1 on
+     --muted. --ring is left alone for whatever else the preset does with it. */
+  --focus: oklch(0.44 0.004 49.3);
+  /* The edge of a form control, which SC 1.4.11 governs at 3:1. --input is
+     1.26:1 on white — fine for a table rule, not for the boundary of the six
+     cells a stranger has to find under mall glare. 4.30:1 on --background. */
+  --field-border: oklch(0.58 0.008 41.2);
   --chart-1: oklch(0.837 0.128 66.29);
   --chart-2: oklch(0.705 0.213 47.604);
   --chart-3: oklch(0.646 0.222 41.116);
@@ -58,6 +73,12 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.547 0.021 43.1);
+  /* Dark mode was never contrast-checked — DESIGN.md said it had to be and no
+     evidence it was. It failed the same rules: ring at 30% is 1.36:1 on the dark
+     page, the input edge 1.48:1. These are the measured replacements: 9.19:1 and
+     4.23:1 respectively. */
+  --focus: oklch(0.76 0.004 49.3);
+  --field-border: oklch(0.56 0.008 41.2);
   --chart-1: oklch(0.837 0.128 66.29);
   --chart-2: oklch(0.705 0.213 47.604);
   --chart-3: oklch(0.646 0.222 41.116);
@@ -76,6 +97,10 @@
 @theme inline {
   --font-mono: var(--font-mono);
   --font-heading: var(--font-heading);
+  /* DESIGN.md:83 defines a label step and the codebase was writing it by hand as
+     `text-[0.8125rem]` in eleven places across five files. A step that exists in
+     the design doc but not in the theme is a step that drifts. */
+  --text-label: 0.8125rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -90,6 +115,8 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
+  --color-focus: var(--focus);
+  --color-field-border: var(--field-border);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
@@ -116,9 +143,53 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The one authored moment in the product.
+ *
+ * DESIGN.md names it: the agent's store → success transition is where motion
+ * earns real weight, because the locker label arriving is a decision the system
+ * just made on the agent's behalf, and a decision that appears by re-render reads
+ * as a page that was always going to say that. 200ms, ease-out, travelling a
+ * short distance — a result landing, not an entrance.
+ *
+ * The reduced-motion alternative is a crossfade rather than nothing: the state
+ * change still needs to register, it just stops moving.
+ */
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes result-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-result {
+  animation: result-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-result {
+    animation: result-fade 200ms ease-out both;
+  }
+}
+
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    /* Was `outline-ring/50` — 1.53:1 on white, so the fallback outline every
+       element inherits was invisible. Full-opacity --focus instead. */
+    @apply border-border outline-focus;
   }
   body {
     @apply bg-background text-foreground;

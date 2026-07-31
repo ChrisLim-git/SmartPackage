@@ -17,7 +17,8 @@ const DAY_CHOICES = [0, 1, 3, 7, 14]
  */
 export const DemoParcels = ({ onUse }: { onUse: (code: string) => void }) => {
   const [daysAgo, setDaysAgo] = useState(0)
-  const parcels = useDemoParcels(true)
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const parcels = useDemoParcels()
   const mint = useMintDemoParcel()
   const reset = useResetDemoParcels()
 
@@ -77,28 +78,42 @@ export const DemoParcels = ({ onUse }: { onUse: (code: string) => void }) => {
           type="button"
           variant="outline"
           className="h-11 flex-1 px-3 text-base"
-          onClick={() => mint.mutate(daysAgo)}
+          onClick={() => {
+            setConfirmingReset(false)
+            mint.mutate(daysAgo)
+          }}
           disabled={busy}
         >
           <RiAddLine className="size-4" aria-hidden />
           {mint.isPending ? "Creating…" : "Create parcel"}
         </Button>
+        {/* Two-step, not `title`: this deletes every parcel, and a tooltip is
+            invisible on the touch devices this screen is built for. */}
         <Button
           type="button"
-          variant="ghost"
+          variant={confirmingReset ? "destructive" : "ghost"}
           className="h-11 px-3 text-base"
-          onClick={() => reset.mutate()}
+          onClick={() =>
+            confirmingReset
+              ? reset.mutate(undefined, {
+                  onSettled: () => setConfirmingReset(false),
+                })
+              : setConfirmingReset(true)
+          }
           disabled={busy}
-          title="Deletes every parcel and frees every locker"
         >
           <RiDeleteBinLine className="size-4" aria-hidden />
-          {reset.isPending ? "Resetting…" : "Reset"}
+          {reset.isPending
+            ? "Resetting…"
+            : confirmingReset
+              ? "Delete every parcel?"
+              : "Reset"}
         </Button>
       </div>
 
       {(mint.isError || reset.isError) && (
         <p role="alert" className="text-label text-destructive">
-          {(mint.error ?? reset.error)?.message}
+          {reset.isError ? reset.error.message : mint.error?.message}
         </p>
       )}
 

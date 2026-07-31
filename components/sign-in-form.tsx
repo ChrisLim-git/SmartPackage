@@ -70,8 +70,14 @@ export function SignInForm() {
   // Demo picker goes through the same sign-in path as the form.
   const pickRole = async (email: string) => {
     setBusyRole(email.split("@")[0])
-    await signIn({ email, password: DEMO_PASSWORD })
-    setBusyRole(null)
+
+    // `finally`: a throw below would otherwise leave every picker and the
+    // submit button disabled until reload.
+    try {
+      await signIn({ email, password: DEMO_PASSWORD })
+    } finally {
+      setBusyRole(null)
+    }
   }
 
   return (

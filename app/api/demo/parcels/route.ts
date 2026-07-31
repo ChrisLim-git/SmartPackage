@@ -148,9 +148,13 @@ export async function POST(request: Request) {
     // Hashed only so GET can tell whether this parcel is still waiting.
     const code = PickupCode.create(stored.value.pickupCode)
 
+    // The service just minted this code, so a rejection here is a broken
+    // invariant, not input: fail loudly rather than mint an unlistable parcel.
+    if (isErr(code)) throw new Error("Stored a package with an invalid code")
+
     const parcel: Minted = {
       pickupCode: stored.value.pickupCode,
-      pickupCodeHash: isErr(code) ? "" : hasher.hash(code.value),
+      pickupCodeHash: hasher.hash(code.value),
       lockerLabel: stored.value.lockerLabel,
       stationName: station.name,
       recipientName: recipient,

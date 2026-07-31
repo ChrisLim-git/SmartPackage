@@ -6,7 +6,11 @@ export const DEMO_MODE =
   process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
   process.env.NODE_ENV !== "production"
 
-/** The seeded staff accounts. Restated here so no client imports the seed. */
+/**
+ * The seeded staff accounts, restated because `lib` is a `ui` element and may
+ * not import `src/infrastructure`. Keep in step with `SEED_PASSWORD` and
+ * `ACCOUNTS` in `src/infrastructure/database/seed.ts`.
+ */
 export const DEMO_ACCOUNTS = [
   {
     role: "admin",

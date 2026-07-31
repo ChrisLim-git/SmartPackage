@@ -14,9 +14,8 @@ export type DemoParcelDto = {
 }
 
 /** Test parcels minted this session that are still uncollected. */
-export const useDemoParcels = (enabled: boolean) =>
+export const useDemoParcels = () =>
   useQuery({
     queryKey: queryKeys.demoParcels,
     queryFn: () => get<DemoParcelDto[]>("/demo/parcels"),
-    enabled,
   })

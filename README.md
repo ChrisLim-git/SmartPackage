@@ -28,6 +28,17 @@ pnpm dev                            # http://localhost:3000
 
 These are demo credentials on a local database, published so a reviewer never has to guess.
 
+### Testing affordances
+
+Two things exist only to make this quick to evaluate, and both are gated behind `DEMO_MODE` in `lib/demo-mode.ts` — on outside production, and opt-in on a hosted demo with `NEXT_PUBLIC_DEMO_MODE=true`. The API route behind them answers **404** when it is off, so it does not appear to exist.
+
+- **Sign-in has a role picker.** One tap signs in as `admin` or `agent`, through the same code path as the form.
+- **The collect page can mint test parcels.** "Create parcel" stores a real one via `StorePackageService` and shows its code; "Use" fills the six cells.
+- **Stay length is selectable** — Today / 1d / 3d / 7d / 14d — so a collection can be charged across real fee tiers without waiting. It backdates through the service's own `Clock` rather than editing `stored_at` afterwards, so the fee comes from a genuine stay. A 7-day parcel collects at **$22.00** — `5d@$2.00 + 3d@$4.00` — which is the piecewise banding the collect screen explains.
+- **"Reset" deletes every parcel and frees every locker**, returning the app to its seeded state.
+
+**Pre-existing parcels cannot be listed, and that is the design working.** A pickup code is shown once and only its hash is kept — the partial unique index on that hash is what lets `/collect` ask for six characters and nothing else. Listing live codes would mean persisting plaintext, which would delete the property the whole flow rests on. So the panel mints parcels and holds their codes **in memory for the life of the process**, never in the database. Collected codes drop off the list automatically, because it is filtered against the real package status.
+
 **Two accounts, and no way to make a third.** There is no sign-up: collecting a parcel needs no account — the code is the credential and `/collect` is public — so a self-service account would grant precisely the access an anonymous visitor already has. The endpoint is closed with `disableSignUp`, not merely unlinked, and a test asserts a sign-up request creates nothing.
 
 Both accounts are provisioned by the seed through Better Auth's own context, which is also how the tests make an account. Roles are **granted, never chosen**: `role` carries `input: false`, so it cannot travel in any request payload and is settable only on that provisioning path.
@@ -163,6 +174,8 @@ The seventeen losers are told `NoSuitableLockerAvailable`, which from where the 
 
 State machines are deliberately tiny, and illegal transitions return errors rather than throwing. `Locker` is `available ⇄ occupied`. `Package` is `stored → retrieved`, terminal — so retrieving twice fails, which is the code-replay edge case.
 
+Collection has the same shape of race from the other side — two requests holding one code — and the same class of fix: `findStoredByCodeHash` reads the parcel row `FOR UPDATE`, so the loser's re-read finds a parcel that is no longer `stored` and answers exactly as a replay does. The contention suite proves both directions: twenty concurrent stores win three lockers, and twenty concurrent collections of one code open one door and invoice one fee.
+
 ### Errors are results
 
 The domain returns `Result<T, E>`. "No suitable locker" and "wrong pickup code" are expected _outcomes_, not exceptional ones — under contention a failed claim is normal. A thrown error means a bug or an infrastructure failure. One mapper turns the error taxonomy into status codes, so the domain knows nothing about HTTP even though the handler that calls it is an HTTP file.
@@ -271,3 +284,5 @@ git log --oneline pre-squash-full-history
 Known gaps are tracked here as they arise rather than discovered by a reader:
 
 - Integration tests share one test database, so Jest runs a single worker. Per-worker databases are the real fix and are not worth the machinery for a suite that finishes in seconds.
+- **A collection that goes wrong at the door has no screen.** The collect success state says the locker is open, and the system's responsibility ends at naming it — but the recipient standing in front of a door that did not open has nowhere to go: no support contact, no station number, no reference to quote to whoever they reach. That is the highest-stakes outcome in the product and it is the one user state that was not designed. It stays out of scope because a real answer needs an escalation channel and a station operator to escalate _to_, and neither exists in this build any more than the notification channel does. Naming it is not the same as covering it: a deployed system needs this state before it meets a customer.
+- **Rejection is deliberately undifferentiated, and the honest user pays for it.** Every refused code returns one identical sentence, because telling a caller _why_ a code failed tells an attacker which half of the guess was right. The cost is that a recipient who mistyped, a recipient whose parcel was already collected, and a recipient given the wrong code all read the same line and get the same non-advice — and there is no reference number to carry into a support conversation that, per the gap above, has no destination. Differentiating safely means an out-of-band identity check on the recipient's email, which is the same missing channel again. In scope by contrast: the field silently rejects the letters and digits the code alphabet excludes, and saying so under the input costs nothing and is being fixed.

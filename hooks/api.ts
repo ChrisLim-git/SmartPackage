@@ -38,9 +38,13 @@ export const get = async <T>(path: string): Promise<T> =>
 export const post = async <T>(path: string, body: unknown): Promise<T> =>
   (await client.post<T>(path, body)).data
 
+export const del = async <T>(path: string): Promise<T> =>
+  (await client.delete<T>(path)).data
+
 /** One place for the keys, so an invalidation and a query cannot drift apart. */
 export const queryKeys = {
   stations: ["stations"] as const,
   lockerSizes: ["locker-sizes"] as const,
   lockers: ["lockers"] as const,
+  demoParcels: ["demo-parcels"] as const,
 }

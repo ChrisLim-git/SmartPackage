@@ -1,0 +1,27 @@
+# Everything the image builds for itself, plus everything it must never carry.
+node_modules
+.next
+out
+build
+coverage
+
+.git
+.githooks
+.vscode
+.claude
+.impeccable
+.remember
+
+# Secrets: the demo image takes its environment from compose, never from a file.
+.env
+.env.*
+!.env.example
+
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Planning context and agent guidance, not part of the deliverable.
+PRODUCT.md
+CLAUDE.md
+AGENTS.md

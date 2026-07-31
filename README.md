@@ -6,12 +6,28 @@ A locker network for parcel drop-off and collection. A delivery agent stores a p
 
 ## Running it
 
+### The whole thing in Docker
+
+Requires Docker only. No Node, no pnpm, no `.env` file.
+
+```bash
+docker compose --profile demo up --build   # http://localhost:3000
+```
+
+That builds the app, waits for Postgres, migrates, seeds, and starts the server. Both steps are re-runnable — migrations are tracked and the seed never overwrites a row — so a restart against an existing volume is a no-op, and `docker compose --profile demo down -v` gives a clean slate.
+
+The image is a **demo image, not a production one**: it carries `drizzle-kit` and `tsx` on purpose so the container can bring an empty database up by itself, and `docker-compose.yml` holds a committed `BETTER_AUTH_SECRET` so the stack runs with no setup. Neither belongs on a real deployment.
+
+`NEXT_PUBLIC_DEMO_MODE` is a **build** argument, not only a runtime variable. Next inlines `NEXT_PUBLIC_*` into the client bundle, and `NODE_ENV` is production in this image, so setting it at runtime alone would leave the affordances below compiled out.
+
+### For development
+
 Requires Node 20.9+, pnpm, and Docker.
 
 ```bash
 pnpm install
 cp .env.example .env.local          # then fill it in — see the comments in the file
-docker compose up -d --wait         # Postgres 18
+docker compose up -d --wait         # Postgres 18 only; the app profile stays down
 pnpm db:migrate
 pnpm db:seed                        # two staff accounts, master data, lockers
 pnpm dev                            # http://localhost:3000

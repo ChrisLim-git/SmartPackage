@@ -22,5 +22,31 @@ services:
       timeout: 3s
       retries: 15
 
+  # Profiled, so a bare `docker compose up` still serves the database only and
+  # the app runs from `pnpm dev` against it. `--profile demo` runs both.
+  app:
+    profiles: ["demo"]
+    build:
+      context: .
+      args:
+        # Build-time, not runtime: Next inlines NEXT_PUBLIC_* into the client
+        # bundle, and NODE_ENV is production here.
+        NEXT_PUBLIC_DEMO_MODE: "true"
+    container_name: smartpackage-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/smartpackage
+      BETTER_AUTH_URL: http://localhost:3000
+      # Demo-only, committed on purpose so the stack runs with no setup. Rotating
+      # it invalidates every session. A real deployment generates its own:
+      # openssl rand -base64 32
+      BETTER_AUTH_SECRET: demo-only-secret-not-for-any-real-deployment
+      NEXT_PUBLIC_DEMO_MODE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres-data:

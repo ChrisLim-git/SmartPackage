@@ -20,17 +20,8 @@ export type LockerAttributes = {
 }
 
 /**
- * A single locker, and the consistency boundary of the whole system: **at most
- * one package occupies a locker at any time.**
- *
- * The state machine is deliberately two states. Transitions return a new
- * `Locker` rather than mutating this one — a mutable entity shared between two
- * concurrent store requests would resolve the collision inside JavaScript
- * object state, where it looks solved, instead of at the database row, which is
- * the only place it actually is.
- *
- * An illegal transition is an `Err`, not a throw. Under contention, losing a
- * race for a locker is an ordinary outcome.
+ * A locker — the consistency boundary: at most one package per locker at any time.
+ * Transitions return a new `Locker`; the race is settled at the database row.
  */
 export class Locker {
   private constructor(
@@ -52,7 +43,6 @@ export class Locker {
       return err(malformedInput("locker", "a station is required"))
     }
     if (label.length === 0) {
-      // The label is how a person finds the locker in front of them.
       return err(malformedInput("locker", "a label is required"))
     }
 
@@ -69,17 +59,8 @@ export class Locker {
   }
 
   /**
-   * Rebuilds a locker that already exists, in whatever state it was left in.
-   *
-   * Separate from `create` because the two answer different questions. `create`
-   * makes a locker that has never existed, and a new locker is always
-   * available — there is no legitimate way to install one with a package
-   * already inside. Reading one back is not creation, and forcing it through
-   * the same door would mean every occupied locker came out of the database
-   * empty.
-   *
-   * This is the only path that can produce an occupied locker without a
-   * transition, which is why it is named for persistence and used nowhere else.
+   * Rebuilds a persisted locker in whatever state it was left in — the only
+   * path that can produce an occupied locker without a transition.
    */
   static rehydrate(
     attributes: LockerAttributes & {
@@ -119,8 +100,7 @@ export class Locker {
 
   occupy(packageId: string): Result<Locker, LockerAlreadyOccupied> {
     if (this.status === "occupied") {
-      // Including when it is the same package. Treating that as success would
-      // report a double-store as fine and lose track of the first package.
+      // Even for the same package: a double-store is not success.
       return err(lockerAlreadyOccupied(this.id))
     }
 

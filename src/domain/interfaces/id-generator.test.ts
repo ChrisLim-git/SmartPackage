@@ -15,8 +15,7 @@ describe("SequentialIdGenerator", () => {
   })
 
   it("pads so the ids sort into the order they were issued", () => {
-    // The real generator is UUIDv7, which is time-ordered. A double that
-    // ordered 10 before 9 would let a test pass that the real thing fails.
+    // Real generator is UUIDv7 (time-ordered); the double must sort in issue order too.
     const ids = new SequentialIdGenerator()
     const issued = Array.from({ length: 11 }, () => ids.next())
 

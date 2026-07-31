@@ -36,13 +36,9 @@ export class CustomerRepository extends EntityRepository<
   }
 
   /**
-   * One insert that yields either the new row or the one already there.
-   *
-   * A read followed by a write would let two agents storing packages for the
-   * same new recipient at the same moment create two customers; the unique
-   * index settles it instead, and `onConflictDoUpdate ... returning()` gives
-   * back a row in both cases — unlike `onConflictDoNothing`, which returns
-   * nothing when it loses.
+   * One insert yielding either the new row or the existing one — a read then a
+   * write would race two customers into existence. `onConflictDoUpdate ...
+   * returning()` returns a row in both cases; `onConflictDoNothing` would not.
    */
   async findOrCreateByEmail(
     details: { email: string; name: string; phone?: string | null },
@@ -71,8 +67,7 @@ export class CustomerRepository extends EntityRepository<
       })
       .onConflictDoUpdate({
         target: customer.email,
-        // Nothing about the existing person is overwritten: the agent typed an
-        // address to find someone, not to rename them.
+        // The existing person is never overwritten.
         set: { updatedBy: actor.actingUserId },
       })
       .returning()

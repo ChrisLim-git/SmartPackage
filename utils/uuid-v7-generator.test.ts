@@ -17,8 +17,7 @@ describe("UuidV7Generator", () => {
   })
 
   it("produces ids that sort by the order they were created", () => {
-    // This is the whole reason for v7 over v4: a time-ordered primary key
-    // keeps the index from fragmenting, and makes "most recent" a plain sort.
+    // The whole reason for v7 over v4: a time-ordered primary key.
     const issued = Array.from({ length: 100 }, () => ids.next())
 
     expect([...issued].sort()).toEqual(issued)

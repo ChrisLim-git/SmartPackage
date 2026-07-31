@@ -21,10 +21,7 @@ export class LockerSizeRepository extends EntityRepository<
     )
   }
 
-  /**
-   * By rank, which is the ladder itself — alphabetical would put L before M and
-   * S, and a size picker would read as nonsense.
-   */
+  /** By rank — alphabetical would put L before M and S. */
   protected override order(): (SQL | PgColumn)[] {
     return [asc(lockerSize.rank)]
   }

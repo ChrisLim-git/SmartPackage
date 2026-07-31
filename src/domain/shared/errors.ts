@@ -1,12 +1,6 @@
 /**
- * The domain's failure taxonomy: a discriminated union on `code`, carried by
- * the `Err` side of a `Result`.
- *
- * These are plain data, not `Error` subclasses. Data compares by structure, so
- * a test asserts `toEqual(lockerAlreadyOccupied(id))` instead of matching a
- * message; messages stay free to change without breaking tests, and one mapper
- * at the HTTP edge turns a `code` into a status without a chain of
- * `instanceof`.
+ * The domain's failure taxonomy: a discriminated union on `code`. Plain data,
+ * not `Error` subclasses — compared by structure, never by message.
  */
 
 export type DomainErrorCode = DomainError["code"]
@@ -30,10 +24,7 @@ export type LockerNotOccupied = {
   readonly message: string
 }
 
-/**
- * The single code for every invalid-pickup scenario the specification leaves
- * unenumerated. It carries no context on purpose — see `invalidPickupRequest`.
- */
+/** The single code for every invalid-pickup scenario; carries no context — see `invalidPickupRequest`. */
 export type InvalidPickupRequest = {
   readonly code: "InvalidPickupRequest"
   readonly message: string
@@ -58,10 +49,7 @@ export type StationNotFound = {
   readonly message: string
 }
 
-/**
- * A label is unique within a station, so this carries both — the same label at
- * another station is not a conflict, it is the normal case.
- */
+/** A label is unique within a station, so this carries both. */
 export type LockerLabelTaken = {
   readonly code: "LockerLabelTaken"
   readonly stationId: string
@@ -107,10 +95,8 @@ export const lockerNotOccupied = (lockerId: string): LockerNotOccupied => ({
 })
 
 /**
- * Takes no arguments, and that is the point. A code that never existed, a wrong
- * code and a code whose parcel has already gone all produce this one error,
- * because a caller who can tell them apart can dial digits and learn which codes
- * are live.
+ * No arguments by design: wrong, spent, and never-issued codes produce one
+ * indistinguishable error, so callers cannot probe which codes are live.
  */
 export const invalidPickupRequest = (): InvalidPickupRequest => ({
   code: "InvalidPickupRequest",
@@ -146,10 +132,7 @@ export const stationNotFound = (stationId: string): StationNotFound => ({
   message: `No station with id ${stationId}.`,
 })
 
-/**
- * An ordinary thing for an administrator to do twice, not an exceptional one —
- * which is why it is a `Result` and not a throw.
- */
+/** Ordinary, not exceptional — hence a `Result`, not a throw. */
 export const lockerLabelTaken = (
   stationId: string,
   label: string

@@ -10,10 +10,7 @@ const auth = createAuth(db)
 const emailFor = (label: string) =>
   `${label}-${process.pid}-${performance.now().toString().replace(".", "")}@example.test`
 
-/**
- * Accounts are provisioned, never signed up for. The sign-up endpoint is closed
- * — see the last test in this file — so these exercise the path the seed uses.
- */
+/** Accounts are provisioned, never signed up for — sign-up is closed. */
 const provision = (email: string) => provisionAccount(auth, email, "customer")
 
 describe("email and password auth", () => {
@@ -42,9 +39,7 @@ describe("email and password auth", () => {
     const rows = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [
       email,
     ])
-    // The version nibble is the first character of the third group. Left to
-    // its own devices BetterAuth issues a 32-character base62 string, and the
-    // `uuid` audit columns pointing at this id would reject every one.
+    // The version nibble is the first character of the third group.
     expect(rows.rows[0].id.split("-")[2].charAt(0)).toBe("7")
   })
 
@@ -76,7 +71,6 @@ describe("email and password auth", () => {
     })
 
     expect(response.status).toBe(200)
-    // The cookie is the session; without it nothing else works.
     expect(response.headers.get("set-cookie")).toContain(
       "better-auth.session_token"
     )
@@ -109,8 +103,7 @@ describe("email and password auth", () => {
     const email = emailFor("dupe")
     await provision(email)
 
-    // The unique index on email is what enforces it, so this rejects at the
-    // database rather than politely returning a duplicate user.
+    // Enforced by the unique index — rejects at the database.
     await expect(provision(email)).rejects.toThrow()
   })
 
@@ -121,9 +114,7 @@ describe("email and password auth", () => {
       body: { email, password: TEST_PASSWORD },
       asResponse: true,
     })
-    // A Set-Cookie carries attributes (`; Path=/; HttpOnly; …`) that a Cookie
-    // header must not. Sent whole, the server finds no session token, answers
-    // 200 for a sign-out with nothing to sign out, and the row survives.
+    // Strip Set-Cookie attributes — sent whole, the server finds no session token.
     const cookie = (signedIn.headers.get("set-cookie") ?? "").split(";")[0]
 
     const response = await auth.api.signOut({
@@ -158,7 +149,7 @@ describe("email and password auth", () => {
       asResponse: true,
     })
 
-    // Signing out on one device must not sign the person out everywhere.
+    // One device's sign-out must not sign the person out everywhere.
     expect(
       await auth.api.getSession({
         headers: new Headers({ cookie: firstCookie }),
@@ -167,15 +158,7 @@ describe("email and password auth", () => {
   })
 
   it("refuses to sign anybody up", async () => {
-    // The whole self-service vector, closed. Nobody signs up for this service:
-    // collecting a parcel needs no account, so an account created here would
-    // hold exactly the access an anonymous visitor already has. The two staff
-    // accounts are provisioned by the seed.
-    //
-    // This replaces an earlier test that posted `role: "admin"` in a sign-up
-    // body to prove `input: false` refused the escalation. Closing the endpoint
-    // is the stronger statement — there is no account to escalate. `input: false`
-    // stays in place regardless, because it guards every other write of the field.
+    // Self-service sign-up is closed; the seed provisions the only accounts.
     const email = emailFor("nosignup")
 
     const response = await auth.api.signUpEmail({

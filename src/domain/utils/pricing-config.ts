@@ -12,15 +12,8 @@ const invalid = (reason: string): MalformedInput =>
   malformedInput("pricing", reason)
 
 /**
- * A base rate and the fee table that scales it.
- *
- * Validated hard at construction, because every way a tier set can be wrong is
- * a revenue bug that nothing else will report: a gap is a day with no rate, an
- * overlap is a day with two, and a table with no unbounded band means a long
- * enough stay falls off the end and is stored for free.
- *
- * Unsorted input is rejected rather than reordered. Silently sorting would mean
- * the table an administrator reads is not the table that charges the customer.
+ * A base rate and the fee table that scales it. Validated at construction:
+ * gaps, overlaps, a missing unbounded band, and unsorted input are all rejected.
  */
 export class PricingConfig {
   private constructor(
@@ -56,8 +49,7 @@ export class PricingConfig {
       const previous = tiers[index - 1]
       const current = tiers[index]
 
-      // One check covers gaps, overlaps and unsorted input: each band must
-      // begin on the day after the one before it ended.
+      // Each band must begin the day after the previous ended; covers gaps, overlaps, unsorted input.
       if (previous.toDay === null || current.fromDay !== previous.toDay + 1) {
         return err(
           invalid("tiers must be sorted, contiguous and non-overlapping")

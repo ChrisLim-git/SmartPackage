@@ -20,30 +20,17 @@ export type AuditStamp = {
 }
 
 /**
- * The mechanics every repository here shares: one connection that may be a
- * transaction, the soft-delete filter, the actor stamp, and a single way to fail
- * when a row cannot be rebuilt.
- *
- * Written as a generic base rather than an interface each repository restates.
- * The five repositories had one `findById` between them repeated five times, and
- * each copy was another chance to forget `deleted_at IS NULL` — a mistake that
- * fails by quietly resurrecting deleted rows rather than by breaking.
- *
- * Nothing here declares `implements`. The shapes the domain needs live in
- * `@domain/interfaces/repository`, and TypeScript checks a repository against
- * them structurally where it is handed to a service or the `UnitOfWork` — the
- * only place a mismatch could do harm.
+ * Shared repository mechanics: a connection that may be a transaction, the
+ * soft-delete filter, the actor stamp, and one way to fail a rebuild.
+ * No `implements` — the domain interfaces are checked structurally where a
+ * repository is handed to a service or the `UnitOfWork`.
  */
 export abstract class BaseRepository<TTable extends AuditedTable> {
   constructor(protected readonly db: DbOrTx) {}
 
   protected abstract readonly table: TTable
 
-  /**
-   * A transaction handle and the pool differ in type but not in the subset of
-   * the query builder used here. The cast is in one place so no repository
-   * method repeats it.
-   */
+  /** Pool and transaction handle differ in type, not in the builder subset used here. */
   protected get query(): Db {
     return this.db as Db
   }
@@ -58,11 +45,8 @@ export abstract class BaseRepository<TTable extends AuditedTable> {
   }
 
   /**
-   * Unwraps an entity rebuilt from a row, naming the row that cannot be read.
-   *
-   * A row read back is always one this codebase wrote, so an entity refusing to
-   * rebuild is a bug here rather than bad input — hence a throw and not a
-   * `Result` for the caller to handle.
+   * Unwraps an entity rebuilt from a row. A row that cannot be read back is a
+   * bug, not bad input — hence a throw, not a `Result`.
    */
   protected rebuilt<T>(result: Result<T, { message: string }>, id: string): T {
     if (isErr(result)) {
@@ -76,13 +60,8 @@ export abstract class BaseRepository<TTable extends AuditedTable> {
 }
 
 /**
- * A repository whose entity maps to one row of one table, which is most of them:
- * `findById` and `findAll` are then the same query twice over, and only the row
- * mapping and the sort order differ.
- *
- * A collection whose reads need a join — `locker`, which is meaningless without
- * its size — extends `BaseRepository` directly and writes its own reads, rather
- * than inheriting two that cannot answer correctly.
+ * A repository whose entity maps to one row of one table. Repositories whose
+ * reads need a join extend `BaseRepository` directly instead.
  */
 export abstract class EntityRepository<
   TEntity,
@@ -90,10 +69,7 @@ export abstract class EntityRepository<
 > extends BaseRepository<TTable> {
   protected abstract toEntity(row: TTable["$inferSelect"]): TEntity
 
-  /**
-   * How `findAll` sorts. Insertion order is meaningless to whoever reads the
-   * list and changes when the seed does, so every listing states its order.
-   */
+  /** How `findAll` sorts — every listing states its order. */
   protected order(): (SQL | PgColumn)[] {
     return [asc(this.table.id)]
   }
@@ -101,9 +77,8 @@ export abstract class EntityRepository<
   async findById(id: string): Promise<TEntity | null> {
     const [row] = await this.query
       .select()
-      // Widened to the base table type: the generic parameter carries the row
-      // shape, which the query builder cannot narrow for a table it only knows
-      // abstractly. The row is cast back on the way out.
+      // Widened: the builder cannot narrow an abstract table type; the row is
+      // cast back on the way out.
       .from(this.table as PgTable)
       .where(and(eq(this.table.id, id), this.visible))
       .limit(1)

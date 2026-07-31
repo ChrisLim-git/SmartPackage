@@ -42,15 +42,8 @@ const BODIES: Record<string, unknown> = {
   "/lockers": LOCKERS,
 }
 
-/**
- * Stubbed at `hooks/api`, which is the seam that belongs to this test.
- *
- * Not at `fetch`: the client is axios, so a `fetch` stub in jsdom intercepts
- * nothing — axios reaches for `XMLHttpRequest` — and a test asserting a rendered
- * count has no business knowing which transport is underneath. One level down,
- * the hooks and the interceptor still run for real.
- */
-/** Paths set here fail the next request, so a test can break one query at a time. */
+// Stubbed at `hooks/api`, not `fetch`: axios uses XMLHttpRequest under jsdom,
+// so a fetch stub intercepts nothing. Paths in `failing` fail the next request.
 const failing = new Set<string>()
 
 jest.unstable_mockModule("@/hooks/api", () => ({
@@ -101,11 +94,7 @@ const capacityCells = async (station: string) => {
     .map((cell) => cell.textContent)
 }
 
-/**
- * Level 1's *"viewing the list of lockers along with their current availability
- * status"* is a count, and the count is derived here rather than by the API —
- * which makes this the only place it can be checked.
- */
+/** The free/total count is derived here, not by the API — only checkable here. */
 describe("the locker capacity table", () => {
   it("counts free against total, per station and per size", async () => {
     renderAdmin()
@@ -122,9 +111,7 @@ describe("the locker capacity table", () => {
   it("reads a size with none free differently from a size with none at all", async () => {
     renderAdmin()
 
-    // Harbour's only locker is an occupied medium. "0 / 1" is a station under
-    // pressure; "0 / 0" is a size that was never installed. Collapsing the two
-    // into an empty cell would hide the first.
+    // "0 / 1" is pressure; "0 / 0" is a size never installed.
     expect(await capacityCells("Harbour")).toEqual([
       "Harbour",
       "0 / 0",
@@ -148,11 +135,7 @@ describe("the locker capacity table", () => {
   })
 })
 
-/**
- * A failed load and an empty estate look identical unless the screen says
- * otherwise, and they call for opposite actions: one is "try again", the other
- * is "add a locker". Silence lets an operator conclude there are no stations.
- */
+/** A failed load and an empty estate call for opposite actions; the screen must say which. */
 describe("when a request fails", () => {
   afterEach(() => failing.clear())
 
@@ -165,8 +148,6 @@ describe("when a request fails", () => {
   })
 
   it("says so when the locker sizes could not be loaded", async () => {
-    // The sizes are the capacity table's columns. Without them the table has a
-    // heading row and nothing under it, which reads as an estate with no lockers.
     failing.add("/locker-sizes")
 
     renderAdmin()
@@ -203,8 +184,6 @@ describe("when a request fails", () => {
   })
 
   it("does not claim the station has no lockers when the request failed", async () => {
-    // The empty state is a statement of fact about the estate. Rendering it
-    // over a failed request states something the screen does not know.
     failing.add("/lockers")
 
     renderAdmin()
@@ -214,8 +193,6 @@ describe("when a request fails", () => {
   })
 
   it("refuses to open the add-locker dialog when its choices are missing", async () => {
-    // The dialog needs stations and sizes to offer. Opened without them it is a
-    // form that cannot be completed and does not say why.
     failing.add("/stations")
 
     renderAdmin()

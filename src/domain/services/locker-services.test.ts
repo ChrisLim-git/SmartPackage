@@ -65,8 +65,6 @@ describe("SmallestFitFirstService", () => {
   })
 
   it("takes the smallest that fits, not the exact size", () => {
-    // The rule most implementations get wrong: with no S free, a small
-    // package goes in an M rather than being refused.
     const candidates = [aLocker("L1", L), aLocker("M1", M)]
 
     const chosen = select.select(candidates, smallPackage)
@@ -113,8 +111,6 @@ describe("SmallestFitFirstService", () => {
   })
 
   it("breaks a tie by label, the same way every time", () => {
-    // Two identical lockers must not be chosen by whatever order the
-    // database happened to return, or the same request gives two answers.
     const candidates = [aLocker("A3", S), aLocker("A1", S), aLocker("A2", S)]
 
     const first = select.select(candidates, smallPackage)
@@ -128,9 +124,7 @@ describe("SmallestFitFirstService", () => {
   })
 
   it("considers every candidate it is given, station or not", () => {
-    // The service never learns that stations exist. Scoping the candidate set
-    // is the caller's job, which is what keeps the domain free of a
-    // repository query.
+    // Scoping candidates is the caller's job; the service never learns stations exist.
     const candidates = [
       aLocker("B1", M, "station-2"),
       aLocker("A1", S, "station-1"),
@@ -143,9 +137,6 @@ describe("SmallestFitFirstService", () => {
   })
 
   it("genuinely defers to the fit service it was given", () => {
-    // The proof that the strategy is real rather than decorative: swap in a
-    // service that accepts nothing and selection finds nothing, without the
-    // selection logic changing.
     const nothingFits: LockerFitService = { fits: () => false }
     const fussy = new SmallestFitFirstService(nothingFits)
 

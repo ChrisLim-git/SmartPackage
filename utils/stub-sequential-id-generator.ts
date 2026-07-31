@@ -1,12 +1,9 @@
 import type { IdGenerator } from "@domain/interfaces/id-generator"
 
 /**
- * Predictable ids, so a failed assertion reads `locker-0002` instead of a
- * UUID nobody can trace back to a line of the test.
- *
- * Zero-padded because the real generator is UUIDv7 and sorts by creation time;
- * a double where `id-10` sorted before `id-9` would let an ordering test pass
- * that production fails.
+ * Predictable ids for readable test failures; zero-padded so they sort by issue
+ * order like production's UUIDv7s. Invalid for a `uuid` column — repository
+ * tests use the real `UuidV7Generator`.
  */
 export class SequentialIdGenerator implements IdGenerator {
   private issued = 0

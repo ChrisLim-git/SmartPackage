@@ -4,12 +4,8 @@ import { createTestDb } from "@/utils/test-db"
 
 const { pool } = createTestDb()
 
-/**
- * The handlers, with the session looked up rather than earned — the same
- * arrangement as `/api/lockers`, and for the same reason: what is stubbed is
- * only the session lookup, so `createGuards` still makes the real 401-versus-403
- * decision and everything below the handler is real.
- */
+// Only the session lookup is stubbed (same arrangement as `/api/lockers`):
+// `createGuards` makes the real 401-vs-403 decision, everything below is real.
 const currentSession: { value: unknown } = { value: null }
 
 jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({

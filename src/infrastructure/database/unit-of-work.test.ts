@@ -25,12 +25,9 @@ const STORED_AT = new Date("2026-03-01T09:00:00.000Z")
 const RETRIEVED_AT = new Date("2026-03-03T09:00:00.000Z")
 
 /**
- * The only place transaction semantics are proved rather than assumed.
- *
- * Collecting a parcel marks it retrieved *and* frees its locker. Half of that is
- * either a locker holding a parcel nobody can collect again, or a locker
- * advertised as free with a parcel still inside — so the interesting assertions
- * here are all about what is in the database after a failure.
+ * The only place transaction semantics are proved rather than assumed: a
+ * collection flips the parcel and frees the locker, and half of that is
+ * corruption either way.
  */
 describe("UnitOfWork", () => {
   let network: Network
@@ -100,9 +97,7 @@ describe("UnitOfWork", () => {
       await packages.save(collect(parcel), { actingUserId: null })
     })
 
-    // The fee as the column holds it: `numeric`, not a float. 4.00 arriving as
-    // 3.9999999 is the bug the money rule exists to prevent, and this is the
-    // boundary it would cross.
+    // The fee as the column holds it: a `numeric` string, never a float.
     expect(await stateOf(parcel.id)).toEqual({
       status: "retrieved",
       locker: "available",
@@ -122,9 +117,7 @@ describe("UnitOfWork", () => {
       })
     ).rejects.toThrow("the door would not open")
 
-    // Not "the last write was undone" — neither was. A parcel marked collected
-    // behind an occupied locker is unreachable forever, and the reverse
-    // advertises a locker with a stranger's parcel in it.
+    // Neither write survives — a half-applied collection corrupts either way.
     expect(await stateOf(parcel.id)).toEqual({
       status: "stored",
       locker: "occupied",
@@ -139,10 +132,8 @@ describe("UnitOfWork", () => {
     await uow.run(async ({ lockers, packages }) => {
       await lockers.release(parcel.lockerId, { actingUserId: null })
 
-      // Read through a repository bound to the same transaction: it must see the
-      // uncommitted release. A repository holding the pool instead would read
-      // around the transaction and still say "occupied", which is how a service
-      // ends up deciding on stale state.
+      // Must see the uncommitted release — a pool-bound repository would read
+      // around the transaction and still say "occupied".
       expect((await lockers.findById(parcel.lockerId))?.isAvailable()).toBe(
         true
       )
@@ -158,11 +149,8 @@ describe("UnitOfWork", () => {
       uow.run(async ({ lockers }) => {
         await lockers.release(parcel.lockerId, { actingUserId: null })
 
-        // A nested `run` would check out a *second* connection from the pool and
-        // open an unrelated transaction on it — invisible to the first, unable to
-        // see its uncommitted release, and blocking on any row it holds. No flow
-        // here nests, so this fails loudly instead of pretending to be a
-        // savepoint.
+        // A nested `run` would take a second connection and an unrelated
+        // transaction — it fails loudly instead of pretending to be a savepoint.
         await uow.run(async () => undefined)
       })
     ).rejects.toThrow(/nest/)

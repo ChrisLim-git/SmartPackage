@@ -4,14 +4,8 @@ import { createTestDb } from "@/utils/test-db"
 
 const { pool, db } = createTestDb()
 
-/**
- * The HTTP contract of collecting a parcel.
- *
- * The session lookup is stubbed for the *store* that sets each test up, not for
- * the collection: the collection is the public path and sends no cookie at all,
- * which is the thing worth proving here. The request body is one field, because
- * the code identifies the parcel by itself.
- */
+// The session stub serves the *store* setup only; collection is the public
+// path and sends no cookie at all — that is the thing being proved.
 const currentSession: { value: unknown } = { value: null }
 
 jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({
@@ -91,37 +85,28 @@ describe("POST /api/pickups", () => {
 
   it("lets someone with no session at all collect a parcel", async () => {
     const { lockerLabel, pickupCode } = await storeOne()
-    // No cookie, no header, nothing. A recipient has no account, and requiring
-    // one would make a first delivery uncollectable.
+    // No cookie, no header: recipients have no account; the endpoint is deliberately public.
     currentSession.value = null
 
     const response = await POST(request({ pickupCode }))
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({
-      // A same-day collection is one chargeable day at the base rate, as a fixed
-      // two-decimal string: a float here is the money rule broken at the edge.
+      // Money crosses the wire as a fixed two-decimal string, never a float.
       fee: "2.00",
       chargeableDays: 1,
-      // The locker comes back from the code, which is the whole point: nobody
-      // told the endpoint where the parcel was.
+      // The locker comes back from the code alone.
       lockerLabel,
       packageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       retrievedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-      // The fee arrives with the band that produced it, and the rate is a
-      // fixed two-decimal string for the same reason the total is.
       bands: [{ fromDay: 1, toDay: 1, days: 1, ratePerDay: "2.00" }],
     })
   })
 
   it("explains the fee in bands that multiply out to the fee", async () => {
-    // The property a customer checks by hand. A stay that crossed a tier
-    // boundary is charged at two rates, so one stated rate would give a figure
-    // the total contradicts — which is what this endpoint used to send.
     const { pickupCode } = await storeOne()
 
-    // Backdated so the stay spans the first boundary: five days at 2.00 and two
-    // at 4.00 is 18.00, and never seven days at 2.00.
+    // Backdated across the first boundary: 5 days at 2.00 + 2 at 4.00 = 18.00.
     await pool.query(
       `UPDATE package SET stored_at = now() - interval '6 days 1 hour'
        WHERE status = 'stored'`
@@ -168,9 +153,7 @@ describe("POST /api/pickups", () => {
 
   it("gives nothing away when the flow throws", async () => {
     const { pickupCode } = await storeOne()
-    // A real throw on a real path rather than a mocked one: with no pricing rows
-    // the repository refuses to guess a price, which is the class of failure a
-    // customer must never see the inside of.
+    // A real throw on a real path: with no pricing rows the repository refuses to price.
     await pool.query("DELETE FROM fee_tier")
     await pool.query("DELETE FROM pricing_config")
 
@@ -187,12 +170,10 @@ describe("POST /api/pickups", () => {
   })
 
   it("answers 400 for a code the alphabet cannot contain", async () => {
-    // `O` and `0` are both left out of the alphabet, so this is the shape being
-    // wrong rather than the code being unknown.
+    // `O` and `0` are both outside the alphabet: shape wrong, not code unknown.
     const response = await POST(request({ pickupCode: "K4M9P0" }))
 
-    // Malformed, not invalid: the caller can fix it, and saying so reveals
-    // nothing about which codes are live.
+    // Malformed is fixable by the caller and reveals nothing about live codes.
     expect(response.status).toBe(400)
     expect((await response.json()).error.message).toMatch(/6 characters/)
   })

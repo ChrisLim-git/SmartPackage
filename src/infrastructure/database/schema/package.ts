@@ -26,24 +26,11 @@ const PACKAGE_STATUSES = [
 export const packageStatus = pgEnum("package_status", PACKAGE_STATUSES)
 
 /**
- * A parcel in a locker.
- *
- * Exported as `packageTable` rather than `package`, because `package` is a
- * reserved word in strict mode and every module is strict — `const package =`
- * does not parse. The table is named `package` like every other one here.
- *
- * `pickup_code_hash` is the column name deliberately. Naming it `pickup_code`
- * invites someone to write plaintext into it, and the code is a bearer
- * credential for a physical object: one `SELECT` would then open every occupied
- * locker in the network.
- *
- * `stored_by` is a domain fact, not an audit stamp — the agent answerable for
- * the parcel, with a real key into `user`. It usually equals `created_by`, and
- * that is fine: `created_by` records whatever wrote the row, including a seed
- * or a migration, while this records a person taking responsibility.
- *
- * There is no `retrieved_by`, and the asymmetry is the point: collection needs
- * no account at all, only the code.
+ * A parcel in a locker. Exported as `packageTable` — `package` is a reserved
+ * word in strict mode. `pickup_code_hash` is named to forbid plaintext: the
+ * code is a bearer credential. `stored_by` is a domain fact (the answerable
+ * agent), not an audit stamp; there is no `retrieved_by` because collection
+ * needs no account.
  */
 export const packageTable = pgTable(
   "package",
@@ -55,8 +42,7 @@ export const packageTable = pgTable(
     sizeId: uuid("size_id")
       .notNull()
       .references(() => lockerSize.id),
-    // Kept after collection rather than cleared: which locker held the parcel is
-    // the audit trail, and the locker is freed by its own status, not by this.
+    // Kept after collection as audit trail; the locker is freed by its own status.
     lockerId: uuid("locker_id")
       .notNull()
       .references(() => locker.id),
@@ -64,8 +50,7 @@ export const packageTable = pgTable(
     status: packageStatus("status").notNull().default("stored"),
     storedAt: timestamp("stored_at", { withTimezone: true }).notNull(),
     retrievedAt: timestamp("retrieved_at", { withTimezone: true }),
-    // Null until collection: the fee is not known until the stay ends. Same
-    // `numeric(12,2)`, same prohibition on `mode: "number"`.
+    // Null until collection. Never `mode: "number"`.
     feeCharged: numeric("fee_charged", { precision: 12, scale: 2 }),
     storedBy: uuid("stored_by")
       .notNull()
@@ -73,20 +58,11 @@ export const packageTable = pgTable(
     ...auditColumns,
   },
   (table) => [
-    // A code identifies a parcel on its own — the recipient types six characters and
-    // nothing else — so two stored parcels sharing one would mean a code that
-    // opens whichever locker the query happened to return first.
-    //
-    // Partial, because the constraint is only about parcels still in a locker: a
-    // collected parcel keeps its hash for the audit trail, and reusing that code
-    // years later is fine. Postgres will not infer a partial index in
-    // `ON CONFLICT`, so every upsert against it repeats this predicate in
-    // `targetWhere`.
-    //
-    // Written as raw SQL rather than `eq(table.status, "stored")`: the builder
-    // turns a literal into a bound parameter, and drizzle-kit then emits
-    // `WHERE status = $1` into the migration — which Postgres rejects, since DDL
-    // takes no parameters.
+    // One stored parcel per code. Partial: a collected parcel keeps its hash as
+    // audit trail. Every upsert must repeat this predicate in `targetWhere` —
+    // Postgres will not infer a partial index in ON CONFLICT. Raw sql, not
+    // `eq(...)`: the builder would emit a bound parameter into the migration,
+    // and DDL takes no parameters.
     uniqueIndex("package_stored_pickup_code_unique")
       .on(table.pickupCodeHash)
       .where(sql`status = 'stored' AND deleted_at IS NULL`),

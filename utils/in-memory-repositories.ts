@@ -23,18 +23,8 @@ import type { PricingConfig } from "@domain/utils/pricing-config"
 import type { LockerSize, PackageSize } from "@domain/utils/size"
 
 /**
- * In-memory repositories, for domain-service tests that have no business
- * touching a database.
- *
- * These are not mocks. Each holds real state and answers real queries, so a
- * service exercised against one is exercised properly — it just runs in
- * microseconds. What they cannot prove is anything about SQL, which is why the
- * Postgres implementations are tested separately, and only where they do
- * something a generic repository would not.
- *
- * They have no importer until T401. That is deliberate: the fakes and the
- * repository interfaces were written together in T303, so the contract had a
- * second implementation to answer to before the first one shipped.
+ * In-memory repositories for domain-service tests. Real state, not mocks;
+ * anything about SQL is proven against the Postgres implementations instead.
  */
 
 export class InMemoryStationRepository implements StationRepository {
@@ -71,13 +61,8 @@ export class InMemoryStationRepository implements StationRepository {
 
 export class InMemoryLockerRepository implements LockerRepository {
   /**
-   * The **real** selection policy, not a second implementation of "smallest
-   * fitting".
-   *
-   * If this fake picked lockers its own way, it and the SQL could disagree
-   * about which locker a package belongs in while both test suites stayed
-   * green — and the fast tests would be confirming a rule the system does not
-   * follow.
+   * The real selection policy, so this fake and the SQL cannot drift apart
+   * while both suites stay green.
    */
   private readonly selection = new SmallestFitFirstService(
     new OrdinalFitService()
@@ -204,12 +189,18 @@ export class InMemoryPackageRepository implements PackageRepository {
     const existing = this.parcels.findIndex((held) => held.id === parcel.id)
 
     if (existing !== -1) {
+      // Collection contract: a parcel that has left `stored` is not
+      // overwritten — same answer as the conditional UPDATE in Postgres.
+      if (this.parcels[existing].status !== "stored") {
+        return false
+      }
+
       this.parcels[existing] = parcel
       return true
     }
 
-    // The same rule the partial unique index enforces in Postgres, so the retry
-    // in `StorePackageService` is exercised here rather than only in production.
+    // Same rule as the partial unique index in Postgres, so the retry in
+    // `StorePackageService` is exercised here too.
     if ((await this.findStoredByCodeHash(parcel.pickupCodeHash)) !== null) {
       return false
     }
@@ -290,13 +281,8 @@ export class InMemoryPricingRepository implements PricingRepository {
 }
 
 /**
- * Runs the work and hands back what it returns.
- *
- * There is no rollback here, and pretending otherwise would be worse than not
- * having one: a fake that silently undid writes would let a service depend on
- * atomicity this cannot provide, and the first real failure would happen in
- * Postgres. Whether the transaction actually holds is proven against the
- * database, not here.
+ * No rollback: a fake that undid writes would let a service depend on atomicity
+ * this cannot provide. Atomicity is proven against Postgres.
  */
 export class InMemoryUnitOfWork implements UnitOfWork {
   constructor(private readonly repositories: TransactionalRepositories) {}
@@ -312,8 +298,7 @@ export class InMemoryLockerSizeRepository implements LockerSizeRepository {
   constructor(private readonly sizes: readonly LockerSize[]) {}
 
   async findAll(): Promise<LockerSize[]> {
-    // Rank order, because the selection rule reads the ladder in order and a
-    // fake that returned insertion order would let a bug in that ordering pass.
+    // Rank order: the selection rule reads the ladder in order.
     return [...this.sizes].sort((a, b) => a.rank - b.rank)
   }
 }

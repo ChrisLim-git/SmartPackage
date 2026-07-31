@@ -9,9 +9,8 @@ import { toResponse } from "@infrastructure/external/auth/guard"
 const storeSchema = z.object({
   stationId: z.uuid("stationId must be a uuid"),
   recipient: z.object({
-    // The message is given to the type check as well as the length check: a
-    // field left out entirely is the same mistake as one left blank, and Zod's
-    // default for the former reads "expected string, received undefined".
+    // Message on the type check too: a missing field otherwise reads
+    // "expected string, received undefined".
     name: z
       .string("a recipient name is required")
       .trim()
@@ -25,27 +24,17 @@ const storeSchema = z.object({
     .min(1, "a package size is required"),
 })
 
-/**
- * An agent hands a parcel over and gets back a locker and a code.
- *
- * Guard, validate, delegate, map — the handler holds no behaviour. Which locker
- * the parcel goes in, whether anything fits, and what the recipient's record
- * becomes are all `StorePackageService`, tested against in-memory repositories in
- * microseconds. This layer owns the status code and the wire shape.
- */
+/** Guard, validate, delegate, map — the behaviour lives in `StorePackageService`. */
 export async function POST(request: Request) {
-  // An agent's job, not an administrator's: installing lockers and filling them
-  // are different questions, and roles here are checked rather than ranked.
+  // Roles are checked, not ranked: "agent", not admin-or-above.
   const session = await guards.requireRole(request.headers, "agent")
   if (isErr(session)) return toResponse(session.error)
 
   const command = await parseBody(request, storeSchema)
   if (!command.ok) return command.response
 
-  // A `Result` is an expected outcome and maps to a status; a throw is a bug or
-  // an infrastructure failure, and the flow has several — the pickup-code space
-  // exhausted, a locker that vanished under a stored parcel. Without this the
-  // detail reaches the client as Next's own error page instead of the log.
+  // A `Result` maps to a status; a throw (code space exhausted, vanished
+  // locker) must reach the log, not the client via Next's error page.
   try {
     const stored = await storePackage.execute({
       ...command.data,
@@ -53,15 +42,13 @@ export async function POST(request: Request) {
         ...command.data.recipient,
         phone: command.data.recipient.phone ?? null,
       },
-      // The agent is answerable for the parcel, which is a domain fact rather
-      // than an audit stamp — `stored_by` on the row.
+      // `stored_by` is a domain fact: the agent is answerable for the parcel.
       audit: { actingUserId: session.value.user.id },
     })
 
     if (isErr(stored)) return toHttpResponse(stored.error)
 
-    // 201: a parcel now exists that did not before. The code is in this response
-    // and nowhere else afterwards.
+    // The code is in this response and nowhere else afterwards.
     return Response.json(toStoredPackageDto(stored.value), { status: 201 })
   } catch (thrown) {
     return toServerFailure(thrown)

@@ -31,11 +31,8 @@ const validate = (
 }
 
 /**
- * A size, ordered by an integer `rank` that arrives from master data.
- *
- * There is no `S | M | L` enum anywhere in the domain on purpose: the sizes are
- * rows, and a fourth one is an insert rather than a deployment. Everything that
- * compares sizes compares ranks, so nothing has to change when one is added.
+ * A size ordered by integer `rank` from master data; no `S | M | L` enum, so
+ * adding a size is an insert. Comparisons only use rank.
  */
 export abstract class Size {
   protected constructor(
@@ -45,9 +42,8 @@ export abstract class Size {
   ) {}
 
   /**
-   * Keeps the two subclasses apart nominally. TypeScript is structural, so
-   * without a differing property type a `PackageSize` would be assignable to a
-   * `LockerSize` and a fit check could be written backwards without complaint.
+   * Nominal brand: without it, structural typing would let a `PackageSize`
+   * be assigned where a `LockerSize` is required.
    */
   protected abstract readonly kind: "locker" | "package"
 
@@ -72,13 +68,8 @@ export abstract class Size {
 }
 
 /**
- * A code an operator typed, against the ladder master data actually holds.
- *
- * Written once and shared, because every flow that takes a size code has the
- * same two things to say about an unknown one: it is the caller's typo rather
- * than a state of the estate, and the answer should name the codes that do
- * exist. Two copies of that would drift into two different sentences, and
- * eventually into two different rules about what counts as a size.
+ * Resolves an operator-typed code against master data; an unknown code is the
+ * caller's typo and the error names the valid codes.
  */
 export const findSizeByCode = <TSize extends Size>(
   ladder: readonly TSize[],

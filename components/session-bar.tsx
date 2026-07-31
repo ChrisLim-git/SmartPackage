@@ -8,14 +8,7 @@ import { destinationsFor } from "@/components/navigation"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 
-/**
- * Who is signed in, where they can go, and the way out.
- *
- * Rendered on every page: the sign-out control has to be reachable from wherever
- * a person happens to be, not only from a settings screen. The navigation is here
- * for the same reason — and because a reviewer needs to see what each role can do
- * without being told which URLs to type.
- */
+/** Signed-in identity, per-role navigation and sign-out, rendered on every page. */
 export function SessionBar() {
   const router = useRouter()
   const pathname = usePathname()
@@ -33,32 +26,26 @@ export function SessionBar() {
   return (
     <header className="flex flex-col gap-2 border-b px-4 py-3 text-sm">
       <div className="flex items-center justify-between gap-3">
-        {/* Truncates rather than wrapping: at 375px the full name took three
-            lines and pushed the sign-out control off the screen. */}
+        {/* Truncates: wrapping pushed the sign-out control off a 375px screen. */}
         <Link href="/" className="truncate font-heading">
           Smart Package Locker
         </Link>
 
-        {/* Nothing is rendered until the session is known, so the bar does not
-            flash "sign in" at someone who is already signed in. */}
+        {/* Nothing renders until the session is known — no "sign in" flash. */}
         {isPending ? null : session ? (
-          // `shrink-0` so the controls keep their width and the address gives
-          // way instead — the way out must never be the thing that gets clipped.
+          // `shrink-0`: the address gives way, never the sign-out control.
           <div className="flex shrink-0 items-center gap-2">
             <span className="hidden max-w-[24ch] truncate text-muted-foreground sm:inline">
               {session.user.email}
             </span>
-            {/* Labelled, because "agent@smartpackage.test" followed by "agent"
-                is read as one word by a screen reader. */}
+            {/* Labelled: email followed by role reads as one word to a screen reader. */}
             <span
               aria-label={`Role: ${session.user.role}`}
               className="border px-1.5 py-0.5 text-xs uppercase"
             >
               {session.user.role}
             </span>
-            {/* `h-9` rather than the preset's 24px: this is chrome, not a field
-                control, but it is still tapped with a thumb on the surfaces that
-                matter most. */}
+            {/* `h-9` over the preset's 24px: still tapped with a thumb. */}
             <Button
               variant="outline"
               size="sm"
@@ -89,13 +76,10 @@ export function SessionBar() {
               <Link
                 key={destination.href}
                 href={destination.href}
-                // `aria-current` as well as the underline: the current section
-                // cannot be conveyed by weight alone.
+                // `aria-current` too: the current section cannot be weight alone.
                 aria-current={here ? "page" : undefined}
                 className={cn(
-                  // 44px, not the 24px a bare `py-1` gives: this nav renders on
-                  // the agent and collect surfaces, where DESIGN.md's tap-target
-                  // floor applies to everything a thumb can reach.
+                  // min-h-11: DESIGN.md's 44px tap-target floor.
                   "inline-flex min-h-11 items-center transition-colors duration-150",
                   here
                     ? "font-medium underline decoration-2 underline-offset-4"

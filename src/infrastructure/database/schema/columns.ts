@@ -2,13 +2,9 @@ import { sql } from "drizzle-orm"
 import { timestamp, uuid } from "drizzle-orm/pg-core"
 
 /**
- * The primary key every domain table uses: a UUIDv7, time-ordered so inserts
- * land at the end of the index instead of scattering across it.
- *
- * The `uuidv7()` default is Postgres 18's own function — no extension — and it
- * is a safety net, not the source. Ids are generated in the application through
- * the `IdGenerator` interface so an entity is complete and assertable before it ever
- * reaches a repository.
+ * The primary key every domain table uses: a time-ordered UUIDv7. The
+ * `uuidv7()` default (Postgres 18 built-in) is a safety net — ids are normally
+ * generated in the application via `IdGenerator`.
  */
 export const primaryId = () =>
   uuid("id")
@@ -16,31 +12,12 @@ export const primaryId = () =>
     .default(sql`uuidv7()`)
 
 /**
- * Spread into every domain table, so the convention cannot drift across seven
- * of them.
- *
- * **Five columns, not six.** There is deliberately no `deleted_by`: a soft
- * delete is a write, so `updated_by` already records who did it — `deleted_at`
- * is when, `updated_by` is who. The one cost is that if a soft-deleted row were
- * later restored or edited, `updated_by` would be overwritten and the original
- * deleter lost. No restore flow is in scope, so that trade is acceptable; it is
- * written down here so it stays deliberate rather than accidental.
- *
- * `created_by` and `updated_by` are nullable because seeds and system writes
- * genuinely have no acting user, and inventing a sentinel account to dodge a
- * null would be the worse design.
- *
- * They are `uuid`, which holds only because BetterAuth is configured to issue
- * v7 ids. Its own default is a 32-character base62 string, and a `uuid` column
- * rejects every one of those — silently survivable, because a null actor fits
- * either type and a suite that always writes without an actor never finds out.
- *
- * There is deliberately no foreign key to `user`. An audit stamp is a record of
- * what happened, and a key would force a choice between blocking a deletion and
- * rewriting history — neither of which is what an audit column is for.
- *
- * BetterAuth's own tables are exempt — their schema is CLI-generated and
- * editing it invites drift on every regeneration.
+ * Audit columns spread into every domain table (BetterAuth's tables exempt).
+ * No `deleted_by`: a soft delete is a write, so `updated_by` records who and
+ * `deleted_at` when. Actor columns are nullable (seeds have no acting user)
+ * and deliberately have no foreign key to `user` — an audit stamp must not
+ * block a deletion or rewrite history. They are `uuid`, which holds only
+ * because BetterAuth is configured to issue uuid v7 ids.
  */
 export const auditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -50,13 +27,9 @@ export const auditColumns = {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
-    // Stamped on every update, so no repository has to remember — and stamped by
-    // **Postgres**, not by `new Date()`. The default above is the database clock
-    // at microsecond precision; a JavaScript `Date` is the application clock
-    // truncated to milliseconds, and mixing the two makes `updated_at` land up to
-    // a millisecond *before* `created_at` on a fast insert-then-update. That is a
-    // row whose audit trail says it was modified before it existed, and it
-    // surfaced as a test that failed roughly one run in four.
+    // Stamped by Postgres, not `new Date()`: mixing the microsecond database
+    // clock with a millisecond-truncated JS Date can put updated_at before
+    // created_at on a fast insert-then-update.
     .$onUpdate(() => sql`now()`),
   updatedBy: uuid("updated_by"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

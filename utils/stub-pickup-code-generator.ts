@@ -2,12 +2,7 @@ import type { PickupCodeGenerator } from "@domain/interfaces/pickup-code-generat
 import { isErr } from "@domain/shared/result"
 import { PickupCode } from "@domain/utils/pickup-code"
 
-/**
- * Hands out a fixed queue of pickup codes, in order.
- *
- * Every test that stores a package needs to know which code came out, and this
- * is what makes that possible without a mocking framework.
- */
+/** Hands out a fixed queue of pickup codes, in order. */
 export class StubPickupCodeGenerator implements PickupCodeGenerator {
   private readonly queue: PickupCode[]
   private issued = 0
@@ -28,8 +23,7 @@ export class StubPickupCodeGenerator implements PickupCodeGenerator {
     const next = this.queue[this.issued]
 
     if (next === undefined) {
-      // Wrapping around would let a test quietly assert against a code it
-      // never queued. A test that outruns its stub should fail loudly.
+      // No wrap-around: a test that outruns its stub should fail loudly.
       throw new Error(
         `StubPickupCodeGenerator exhausted after ${this.queue.length} code(s)`
       )

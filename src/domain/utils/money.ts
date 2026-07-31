@@ -11,16 +11,8 @@ const invalid = (reason: string): MalformedInput =>
   malformedInput("money", reason)
 
 /**
- * An amount of money, held as a non-negative whole number of minor units.
- *
- * A float cannot represent 0.10, so `0.10 * 3` is 0.30000000000000004 and a
- * bill is wrong by a cent that nobody can find. Integers have no such gap: the
- * amount is 10 and the product is 30, exactly, always.
- *
- * The type is closed on purpose. Every way in validates, every operation
- * returns a new instance, and the only operation that can lose precision —
- * `timesRatio` — names its rounding mode in its documentation and its tests.
- * There is deliberately no `divide`.
+ * An amount of money as a non-negative integer of minor units; a float never
+ * holds an amount. `timesRatio` is the only lossy operation.
  */
 export class Money {
   private constructor(private readonly minorUnits: number) {}
@@ -36,13 +28,7 @@ export class Money {
     return ok(new Money(minorUnits))
   }
 
-  /**
-   * Parses `"12.30"`, `"12.3"` or `"12"`.
-   *
-   * Three decimal places are rejected rather than rounded: a caller writing
-   * `"2.005"` either has a bug or expects a rounding rule it has not stated,
-   * and guessing on its behalf is how a cent goes missing.
-   */
+  /** Parses `"12.30"`, `"12.3"` or `"12"`. Three decimal places are rejected, not rounded. */
   static fromDecimalString(decimal: string): Result<Money, MalformedInput> {
     const match = DECIMAL_PATTERN.exec(decimal)
     if (match === null) {
@@ -80,14 +66,8 @@ export class Money {
   }
 
   /**
-   * Scales by `numerator / denominator`, **rounded half up** to the nearest
-   * minor unit — 0.125 becomes 0.13.
-   *
-   * The only place in the domain where an amount can lose precision, which is
-   * why the ratio is two integers rather than a decimal factor and why the
-   * rounding is stated rather than inherited from `Math.round`. Apply it once,
-   * to a final total: rounding each tier of a fee and then summing collects a
-   * cent of error per tier.
+   * Scales by `numerator / denominator`, rounded half up to the nearest minor
+   * unit. The only lossy operation — apply once, to a final total, not per tier.
    */
   timesRatio(
     numerator: number,

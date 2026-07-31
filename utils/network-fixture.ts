@@ -7,14 +7,8 @@ import { lockerSize } from "@infrastructure/database/schema/locker-size"
 import { station } from "@infrastructure/database/schema/station"
 
 /**
- * The smallest network a package can exist in: an agent, a recipient, a station,
- * the size ladder, and one locker per size.
- *
- * Shared between the suites that need real rows because a `package` row cannot
- * be inserted without all of it — five foreign keys, one of them into
- * BetterAuth's `user`. Every id is whatever the database issued, never a
- * literal: the columns are `uuid` with a `uuidv7()` default, and a test that
- * hard-codes one stops noticing when that changes.
+ * The smallest network a `package` row's five foreign keys allow. Ids are
+ * whatever the database issued, never literals — the columns are `uuid`.
  */
 export type Network = {
   agentId: string
@@ -64,8 +58,7 @@ export const seedNetwork = async (
     .insert(locker)
     .values(
       SIZES.flatMap((size) =>
-        // `S1`, `S2`, … so a label says both what fits and which door it is, and
-        // a contention test can name the three it expects to win.
+        // `S1`, `S2`, … so a contention test can name the lockers it expects to win.
         Array.from({ length: counts[size.code] ?? 0 }, (_, index) => ({
           stationId: site.id,
           sizeId: sizeIds[size.code],

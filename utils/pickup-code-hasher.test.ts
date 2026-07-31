@@ -35,9 +35,7 @@ describe("HmacPickupCodeHasher", () => {
   })
 
   it("needs the pepper as well as the stored hash", () => {
-    // Six digits is a million possibilities: a plain digest in a stolen
-    // database is brute-forced in seconds. The pepper is what stops a
-    // database read from being a master key to every locker.
+    // The pepper is what stops a database read from being a master key.
     const stored = hasher.hash(code("H2K4M7"))
 
     expect(
@@ -49,8 +47,7 @@ describe("HmacPickupCodeHasher", () => {
   })
 
   it("rejects a stored value of the wrong shape instead of throwing", () => {
-    // `timingSafeEqual` throws on a length mismatch, and a route handler that
-    // crashes on a corrupt row tells an attacker something.
+    // `timingSafeEqual` throws on a length mismatch; a corrupt row must not crash the route.
     expect(hasher.matches(code("H2K4M7"), "")).toBe(false)
     expect(hasher.matches(code("H2K4M7"), "deadbeef")).toBe(false)
     expect(hasher.matches(code("H2K4M7"), "not-hex".repeat(10))).toBe(false)

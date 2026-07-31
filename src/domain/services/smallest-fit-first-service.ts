@@ -9,15 +9,8 @@ import type { LockerFitService } from "./locker-fit-service"
 import type { LockerSelectionService } from "./locker-selection-service"
 
 /**
- * Picks the smallest free locker that can hold the package.
- *
- * "Smallest that fits", not "the same size": with no small locker free, a small
- * package belongs in a medium one rather than being refused. Reading the rule
- * as an exact match is the common way to get this wrong, and it turns a full
- * station into a rejected delivery while lockers stand empty.
- *
- * Ties break on label so the same candidate set always yields the same locker.
- * Left to the order rows came back in, one request would answer two ways.
+ * Picks the smallest free locker that fits — not an exact size match; a small
+ * package goes in a medium locker. Ties break on label so selection is deterministic.
  */
 export class SmallestFitFirstService implements LockerSelectionService {
   constructor(private readonly fitService: LockerFitService) {}
@@ -39,8 +32,6 @@ export class SmallestFitFirstService implements LockerSelectionService {
         (a.label < b.label ? -1 : a.label > b.label ? 1 : 0)
     )
 
-    // No station id: this service was never told which station these lockers
-    // belong to, and inventing one for the message would be a lie.
     return best === undefined ? err(noSuitableLockerAvailable()) : ok(best)
   }
 }

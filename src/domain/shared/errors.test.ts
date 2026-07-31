@@ -26,7 +26,6 @@ describe("domain errors", () => {
     for (const error of everyError) {
       expect(error.code).toEqual(expect.any(String))
       expect(error.message.length).toBeGreaterThan(0)
-      // A message that is only the code is not a message.
       expect(error.message).not.toBe(error.code)
     }
   })
@@ -60,7 +59,6 @@ describe("domain errors", () => {
   it("narrows the union on its code", () => {
     const error: DomainError = noSuitableLockerAvailable("station-1")
 
-    // Only the narrowing makes `stationId` reachable.
     if (error.code === "NoSuitableLockerAvailable") {
       expect(error.stationId).toBe("station-1")
     } else {
@@ -69,16 +67,14 @@ describe("domain errors", () => {
   })
 
   it("keeps an already-retrieved package distinct from a rejected pickup", () => {
-    // The two are flattened into one response at the HTTP edge, but staying
-    // distinct in the domain is what lets logs and tests tell them apart.
+    // Flattened into one response at the HTTP edge; distinct in the domain for logs and tests.
     expect(packageAlreadyRetrieved("package-1").code).not.toBe(
       invalidPickupRequest().code
     )
   })
 
   it("says nothing about why a pickup was rejected", () => {
-    // Naming the failed check would tell a caller which locker labels are real
-    // and which hold a package.
+    // Naming the failed check would leak which codes are live.
     expect(invalidPickupRequest()).toEqual({
       code: "InvalidPickupRequest",
       message: expect.any(String),

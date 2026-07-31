@@ -140,8 +140,7 @@ describe("Money", () => {
   })
 
   it("never exposes a divide", () => {
-    // Division without a stated rounding mode is how currency quietly loses a
-    // cent. `timesRatio` is the exception, and it names its rounding.
+    // `timesRatio` is the only division, and it states its rounding.
     const surface = Money.zero() as unknown as Record<string, unknown>
 
     expect(surface.divide).toBeUndefined()

@@ -3,14 +3,7 @@ import { isErr, isOk } from "@domain/shared/result"
 
 import { InMemoryStationRepository } from "@/utils/in-memory-repositories"
 
-/**
- * Bringing a station online.
- *
- * A station has no behaviour of its own — every rule that could live on one is
- * really about the lockers inside it — so what is worth asserting here is that
- * a half-formed station never reaches the database, and that a name is not
- * treated as an identity.
- */
+/** Asserts validation runs before the write, and that a name is not an identity. */
 
 const ADMIN_ID = "019fb1ad-d64b-7fe4-bde0-9c40448920ff"
 
@@ -46,8 +39,6 @@ describe("registering a station", () => {
   })
 
   it("makes it findable straight away, so lockers can be added to it", async () => {
-    // The whole point of the interface: story 27 asks for a locker so a station
-    // can be brought online, and until this existed that took a seed run.
     const { service, stations } = build()
 
     const registered = await service.register(command())
@@ -68,7 +59,6 @@ describe("registering a station", () => {
   })
 
   it("refuses a station with no address", async () => {
-    // A station nobody can find is not somewhere a package can be collected.
     const { service, stations } = build()
 
     const result = await service.register(command({ address: "" }))
@@ -86,8 +76,6 @@ describe("registering a station", () => {
   })
 
   it("allows two stations to share a name", async () => {
-    // Deliberate: a name is a label an operator may want to change, and a
-    // uniqueness constraint here would make renaming one a migration.
     const { service } = build()
 
     await service.register(command())

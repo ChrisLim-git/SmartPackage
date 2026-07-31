@@ -33,17 +33,14 @@ describe("FeeTier", () => {
   })
 
   it("rejects a multiplier finer than the money it multiplies", () => {
-    // Two decimal places, like the currency. More would need a rounding rule
-    // nobody has stated.
+    // Two decimal places, like the currency.
     expect(
       isErr(FeeTier.create({ fromDay: 1, toDay: null, multiplier: 1.005 }))
     ).toBe(true)
   })
 
   it("accepts every multiplier the currency can express", () => {
-    // A float tolerance rejected 255 of these: 2.2 * 100 is
-    // 220.00000000000003, which is further from a whole number than
-    // Number.EPSILON allows, so a x2.2 band was unconfigurable.
+    // 2.2 * 100 is 220.00000000000003; an EPSILON tolerance rejected these valid multipliers.
     for (const multiplier of [2.2, 2.01, 8.7, 0.07, 1.1, 3.3, 19.99]) {
       expect(
         isErr(FeeTier.create({ fromDay: 1, toDay: null, multiplier }))
@@ -103,8 +100,6 @@ describe("PricingConfig", () => {
   })
 
   it("rejects unsorted input rather than quietly reordering it", () => {
-    // Reordering would mean the configuration a person reads is not the
-    // configuration that charges them.
     expect(isErr(configure([tier(6, 10, 2), tier(1, 5, 1)]))).toBe(true)
   })
 })

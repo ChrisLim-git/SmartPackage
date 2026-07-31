@@ -1,5 +1,4 @@
-// Must stay first: it loads the environment, and every import below reads it
-// while being evaluated. Moving it down leaves the pool without a password.
+// Must stay first: the imports below read the environment as they evaluate.
 import "./load-env"
 
 import { eq } from "drizzle-orm"
@@ -12,23 +11,10 @@ import { feeTier, pricingConfig } from "./schema/pricing"
 import { station } from "./schema/station"
 
 /**
- * Master data lives here rather than in a migration: it is reference data an
- * operator may want to re-run or edit, not a schema change.
- *
- * Every write here is re-runnable. Nothing is updated on a second pass either —
- * a seed that overwrites is a seed that quietly discards whatever an operator
- * changed by hand.
- *
- * No write has an acting user, so `created_by` stays null throughout. That is
- * the reason the column is nullable.
+ * Re-runnable seed: existing rows are never overwritten. No write has an
+ * acting user, so `created_by` stays null — the reason the column is nullable.
  */
 
-/**
- * One account per role, so a reviewer can sign in as each without creating
- * anything. The password is the same for all three and is published in the
- * README — these accounts exist on a local demo database, and making them hard
- * to find would only cost a reviewer time without protecting anything.
- */
 const ACCOUNTS: ReadonlyArray<{ name: string; email: string; role: Role }> = [
   { name: "Avery Admin", email: "admin@smartpackage.test", role: "admin" },
   { name: "Ada Agent", email: "agent@smartpackage.test", role: "agent" },
@@ -36,7 +22,6 @@ const ACCOUNTS: ReadonlyArray<{ name: string; email: string; role: Role }> = [
 
 const SEED_PASSWORD = "smartpackage"
 
-/** Re-runnable: an account that already exists is left exactly as it is. */
 const seedAccounts = async () => {
   for (const account of ACCOUNTS) {
     const existing = await pool.query(
@@ -49,12 +34,8 @@ const seedAccounts = async () => {
       continue
     }
 
-    // Provisioned through Better Auth's own context rather than the sign-up
-    // endpoint, because that endpoint is closed — self-service sign-up is
-    // disabled, and these two accounts are the only ones that exist. Going
-    // through the context still means Better Auth hashes the password the way
-    // sign-in will verify it and mints the id the way it mints every other one;
-    // an INSERT here would have to reimplement both.
+    // Via Better Auth's context, since sign-up is disabled: it hashes the
+    // password the way sign-in verifies it and mints the id consistently.
     const context = await auth.$context
     const hashed = await context.password.hash(SEED_PASSWORD)
 
@@ -62,13 +43,11 @@ const seedAccounts = async () => {
       name: account.name,
       email: account.email,
       emailVerified: false,
-      // Settable here and nowhere else. `input: false` keeps `role` out of any
-      // request payload, so granting one is a provisioning act by construction.
+      // Settable only here: `input: false` keeps `role` out of request payloads.
       role: account.role,
     })
 
-    // Without this the row is a user who can never sign in: the password lives
-    // on a linked `credential` account, not on the user.
+    // The password lives on a linked `credential` account, not on the user.
     await context.internalAdapter.linkAccount({
       userId: created.id,
       providerId: "credential",
@@ -86,12 +65,8 @@ const SIZES = [
   { code: "L", rank: 3, label: "Large" },
 ]
 
-/**
- * Central Mall has **exactly three L lockers**, and that number is load-bearing
- * rather than decorative: the contention proof fires twenty concurrent requests
- * for an L package and asserts that exactly three win. Change the count here
- * and that test's expectation changes with it.
- */
+// Central Mall's three L lockers are load-bearing: the contention test asserts
+// exactly three of twenty concurrent stores win.
 const STATIONS = [
   {
     name: "Central Mall",
@@ -115,7 +90,6 @@ const FEE_TIERS = [
 const BASE_RATE_PER_DAY = "2.00"
 const CURRENCY_CODE = "AUD"
 
-/** Returns every size by code, so lockers can point at one without a second round trip each. */
 const seedSizes = async (): Promise<Map<string, string>> => {
   await db.insert(lockerSize).values(SIZES).onConflictDoNothing({
     target: lockerSize.code,
@@ -132,9 +106,7 @@ const seedSizes = async (): Promise<Map<string, string>> => {
 
 const seedStations = async (sizeIds: Map<string, string>) => {
   for (const details of STATIONS) {
-    // Matched on name because there is no unique index on it: a station's name
-    // is a label an operator may well want to change, and a constraint here
-    // would make renaming one a migration.
+    // Matched on name — there is no unique index on it.
     const [existing] = await db
       .select({ id: station.id })
       .from(station)
@@ -154,8 +126,7 @@ const seedStations = async (sizeIds: Map<string, string>) => {
       Array.from({ length: count }, (_, index) => ({
         stationId,
         sizeId: sizeIds.get(code)!,
-        // `S1`, `S2`, … — unique within a station, which is the only place an
-        // agent ever reads one.
+        // `S1`, `S2`, … — unique within a station.
         label: `${code}${index + 1}`,
       }))
     )

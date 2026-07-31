@@ -7,15 +7,7 @@ export type StationAttributes = {
   readonly address: string
 }
 
-/**
- * A location holding lockers.
- *
- * Deliberately thin — a station has no behaviour, because every rule that could
- * live here is really about the lockers inside it. It exists as an entity
- * rather than a row shape so a repository has something to return that a
- * domain service or a route handler can hold without knowing what a database
- * is.
- */
+/** A location holding lockers; no behaviour of its own. */
 export class Station {
   private constructor(
     readonly id: string,
@@ -36,7 +28,6 @@ export class Station {
       return err(malformedInput("station", "a name is required"))
     }
     if (address.length === 0) {
-      // A station nobody can find is not somewhere a package can be collected.
       return err(malformedInput("station", "an address is required"))
     }
 

@@ -12,12 +12,8 @@ import {
 import { unwrap } from "@/utils/unwrap"
 
 /**
- * Installing a locker, as a domain flow rather than four checks in a route.
- *
- * The rules here — the size code is on the ladder, the station exists, the label
- * is free at that station — decide what the caller is told, and none of them is
- * an HTTP concern. Proven against in-memory fakes so each case is a line rather
- * than a fixture.
+ * Rules: the size code is on the ladder, the station exists, the label is free
+ * at that station.
  */
 
 const STATION_ID = "019fb1ad-d64b-7fe4-bde0-9c4044892047"
@@ -86,8 +82,6 @@ describe("installing a locker", () => {
   })
 
   it("refuses a size code the ladder does not have", async () => {
-    // The station may be wide open — telling the caller anything about capacity
-    // would be a lie about their own typo.
     const { service, lockers } = build()
 
     const result = await service.install(command({ sizeCode: "XL" }))
@@ -105,9 +99,6 @@ describe("installing a locker", () => {
   })
 
   it("refuses a station that does not exist", async () => {
-    // Without this the insert reaches a foreign key and the caller is told the
-    // server broke, when what happened is that they named a station that is not
-    // there.
     const { service } = build()
 
     const result = await service.install(
@@ -134,8 +125,7 @@ describe("installing a locker", () => {
   })
 
   it("allows the same label at a different station", async () => {
-    // A label is a door number, unique where somebody is standing and nowhere
-    // else. Two stations both having an `L1` is the normal case.
+    // A label is only unique within a station.
     const otherStationId = "019fb1ad-d64b-7fe4-bde0-9c4044892048"
     const other = unwrap(
       Station.create({

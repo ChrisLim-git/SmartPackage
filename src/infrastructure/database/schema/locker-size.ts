@@ -3,14 +3,9 @@ import { integer, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
 import { auditColumns, primaryId } from "./columns"
 
 /**
- * The size ladder, held as data rather than as an enum.
- *
- * `rank` carries the entire ordering rule — `OrdinalFitService` compares ranks
- * and nothing else — so introducing an XL is an `INSERT`, not a deployment.
- *
- * One ladder serves both lockers and packages. A separate `package_size` table
- * would make the two incomparable, which is precisely the question the fit
- * policy exists to answer.
+ * The size ladder, held as data rather than an enum: `rank` carries the whole
+ * ordering rule, so adding an XL is an INSERT, not a deployment. One ladder
+ * serves both lockers and packages so the fit policy can compare them.
  */
 export const lockerSize = pgTable(
   "locker_size",
@@ -23,8 +18,7 @@ export const lockerSize = pgTable(
   },
   (table) => [
     uniqueIndex("locker_size_code_unique").on(table.code),
-    // Rank is unique too: two sizes sharing one rank makes "does this fit"
-    // ambiguous, and the policy would answer differently depending on row order.
+    // Two sizes sharing one rank would make "does this fit" ambiguous.
     uniqueIndex("locker_size_rank_unique").on(table.rank),
   ]
 )

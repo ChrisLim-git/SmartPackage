@@ -15,8 +15,7 @@ const daysFor = (elapsed: number): number =>
 
 describe("StorageDuration", () => {
   describe("chargeable days", () => {
-    // Both sides of every band. An off-by-one in the ceiling has nowhere to
-    // hide when 24h and 24h+1s are asserted next to each other.
+    // Both sides of every boundary asserted.
     it.each([
       ["nothing at all", 0, 1],
       ["one second", SECOND, 1],
@@ -38,9 +37,8 @@ describe("StorageDuration", () => {
   })
 
   it("measures elapsed time, not calendar dates, across a clock change", () => {
-    // 2026-03-08 is the US spring-forward. A calendar-difference
-    // implementation calls this two days because the date changed; it is
-    // exactly 24 elapsed hours, so it is one.
+    // 2026-03-08 is US spring-forward: exactly 24 elapsed hours is one day,
+    // even though the calendar date advanced.
     const storedAt = new Date("2026-03-08T05:00:00.000Z")
     const retrievedAt = new Date("2026-03-09T05:00:00.000Z")
 

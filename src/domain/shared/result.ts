@@ -1,13 +1,6 @@
 /**
- * `Result` is how every layer reports an expected failure. Throwing is
- * reserved for bugs and infrastructure faults: "no locker fits this package"
- * and "that pickup code is wrong" are ordinary outcomes, and a service that
- * returns them is a service whose failure paths can be asserted without
- * `expect().toThrow()`.
- *
- * Deliberately four operations and no more. This is a return shape, not a
- * monad library — `andThen`, `match` and friends can be added the day a real
- * call site wants one.
+ * `Result` reports expected failures; throwing is reserved for bugs and
+ * infrastructure faults.
  */
 
 export type Ok<T> = { readonly kind: "ok"; readonly value: T }

@@ -24,7 +24,7 @@ export const FormAlert = ({
     <RiAlertLine className="mt-0.5 size-5 shrink-0" aria-hidden />
     <div className="flex flex-col gap-1">
       <p className="font-medium">{message}</p>
-      <p className="text-[0.8125rem] text-muted-foreground">{advice}</p>
+      <p className="text-label text-muted-foreground">{advice}</p>
     </div>
   </div>
 )

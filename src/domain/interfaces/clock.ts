@@ -1,11 +1,4 @@
-/**
- * Where the domain gets the current time.
- *
- * `new Date()` inside a service makes "the fee for a seven-day stay" a test
- * that takes seven days, and lint rejects it in `src/domain` for exactly that
- * reason. Infrastructure supplies `SystemClock`; tests supply a fixed or
- * advanceable one.
- */
+/** Time source for the domain; `new Date()` is banned here. Tests supply a fixed clock. */
 export interface Clock {
   now(): Date
 }

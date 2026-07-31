@@ -14,10 +14,8 @@ type PackageRow = typeof packageTable.$inferSelect
 type SizeRow = typeof lockerSize.$inferSelect
 
 /**
- * Extends the plain base rather than `EntityRepository`, because every read joins
- * the size ladder: the row stores a size id and the entity holds the size
- * itself, so a single-table read would hand back a parcel that cannot say what
- * it needed.
+ * Package persistence. Extends the plain base, not `EntityRepository`: every
+ * read must join the size ladder.
  */
 export class PackageRepository extends BaseRepository<typeof packageTable> {
   protected readonly table = packageTable
@@ -35,9 +33,8 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
       row.locker_size.id
     )
 
-    // `numeric` arrives as a string and becomes money here, through
-    // `fromDecimalString` — never `parseFloat`. This is the only conversion, so
-    // the money rule holds by construction rather than by everyone remembering.
+    // `numeric` arrives as a string; converted only here, via
+    // `fromDecimalString`, never `parseFloat`.
     const feeCharged =
       row.package.feeCharged === null
         ? null
@@ -78,11 +75,11 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
   }
 
   /**
-   * The parcel a code opens, found by the hash of that code.
-   *
-   * Scoped to `stored` and to the same predicate as the partial unique index, so
-   * exactly one row can ever match: a collected parcel keeps its hash for the
-   * audit trail and stops answering to it.
+   * The parcel a code opens, found by the hash of that code and locked
+   * `FOR UPDATE OF package` (the joined size row is master data, left unlocked).
+   * A racing collection blocks on the lock; under READ COMMITTED the predicate
+   * is re-evaluated after the winner commits, so the loser sees `retrieved`,
+   * gets `null`, and answers like any other wrong code.
    */
   async findStoredByCodeHash(pickupCodeHash: string): Promise<Package | null> {
     const [row] = await this.selectPackages()
@@ -94,6 +91,7 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
         )
       )
       .limit(1)
+      .for("update", { of: packageTable })
 
     return row === undefined ? null : this.toEntity(row)
   }
@@ -102,17 +100,16 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
     const [existing] = await this.query
       .select({ id: packageTable.id })
       .from(packageTable)
-      // `visible` here too, not only on the reads: without it a soft-deleted row
-      // sharing this id would send a store down the update branch and quietly
-      // resurrect it.
+      // `visible` here too, or a soft-deleted row with this id would send the
+      // store down the update branch and resurrect it.
       .where(and(eq(packageTable.id, parcel.id), this.visible))
       .limit(1)
 
     if (existing !== undefined) {
-      // A collection, not a store: `stored_by` and the locker stay as they were,
-      // because which agent handed the parcel over and which locker held it are
-      // the audit trail.
-      await this.query
+      // A collection: `stored_by` and the locker stay as audit trail.
+      // Conditional on `stored` so a stale read cannot record a second
+      // collection of a parcel that already left.
+      const flipped = await this.query
         .update(packageTable)
         .set({
           status: parcel.status,
@@ -120,16 +117,21 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
           feeCharged: parcel.feeCharged?.toDecimalString() ?? null,
           updatedBy: actor.actingUserId,
         })
-        .where(eq(packageTable.id, parcel.id))
+        .where(
+          and(
+            eq(packageTable.id, parcel.id),
+            eq(packageTable.status, "stored"),
+            this.visible
+          )
+        )
+        .returning({ id: packageTable.id })
 
-      return true
+      return flipped.length > 0
     }
 
     if (actor.actingUserId === null) {
-      // `stored_by` is a domain fact rather than an audit stamp. A seed may write
-      // a row with no actor; a parcel nobody handed over cannot exist, and
-      // letting the null through would fail as a constraint violation naming a
-      // column instead of saying this.
+      // `stored_by` is a domain fact, not an audit stamp: a parcel nobody
+      // handed over cannot exist.
       throw new Error("a package cannot be stored without an agent")
     }
 
@@ -140,16 +142,11 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
       .limit(1)
 
     if (size === undefined) {
-      // A bug rather than caller input: the size came off the ladder this
-      // repository is now reading.
+      // A bug, not caller input: the size came off this very ladder.
       throw new Error(`no locker size is coded "${parcel.size.code}"`)
     }
 
-    // `onConflictDoNothing` rather than catching a Postgres error code: the
-    // partial unique index is the thing that decides, and reading its verdict
-    // from an empty result keeps the driver's error taxonomy out of this class.
-    // The predicate is repeated in `targetWhere` because Postgres will not infer
-    // a partial index from the column alone.
+    // The partial unique index decides; an empty result is its verdict.
     const written = await this.query
       .insert(packageTable)
       .values({
@@ -167,9 +164,9 @@ export class PackageRepository extends BaseRepository<typeof packageTable> {
       })
       .onConflictDoNothing({
         target: packageTable.pickupCodeHash,
-        // Named `where` on this builder and `targetWhere` on
-        // `onConflictDoUpdate`; both mean the index predicate, and Postgres will
-        // not infer a partial index without it.
+        // Postgres will not infer a partial index in ON CONFLICT — the
+        // predicate must be repeated (`where` here, `targetWhere` on
+        // onConflictDoUpdate).
         where: sql`status = 'stored' AND deleted_at IS NULL`,
       })
       .returning({ id: packageTable.id })

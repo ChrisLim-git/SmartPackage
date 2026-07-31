@@ -22,10 +22,7 @@ export class StationRepository extends EntityRepository<
     )
   }
 
-  /**
-   * No `onConflictDoNothing` and no null return, unlike a locker: nothing about
-   * a station is unique, so there is no conflict for the insert to lose.
-   */
+  /** No conflict handling: nothing about a station is unique. */
   async create(
     details: { name: string; address: string },
     actor: AuditContext
@@ -38,10 +35,7 @@ export class StationRepository extends EntityRepository<
     return this.toEntity(row)
   }
 
-  /**
-   * By name, because this list is read by a person. Insertion order is
-   * meaningless to them and changes when the seed does.
-   */
+  /** By name — this list is read by a person. */
   protected override order(): (SQL | PgColumn)[] {
     return [asc(station.name)]
   }

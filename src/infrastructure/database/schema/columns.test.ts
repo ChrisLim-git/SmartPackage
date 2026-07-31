@@ -5,11 +5,8 @@ import { pgTable, text } from "drizzle-orm/pg-core"
 import { notDeleted } from "../soft-delete"
 import { auditColumns, primaryId } from "./columns"
 
-/**
- * Two throwaway tables built from the same helpers. The point of the pair is
- * the first test: if the shared definition ever stops producing identical
- * columns, the convention has drifted and seven tables disagree.
- */
+// Two throwaway tables from the same helpers — the first test catches the
+// shared definition drifting.
 const widget = pgTable("audit_probe_widget", {
   id: primaryId(),
   name: text("name").notNull(),
@@ -143,10 +140,8 @@ describe("the convention against a real Postgres", () => {
       .where(eq(widget.id, stored.id))
       .returning()
 
-    // Compared in Postgres, not in JavaScript. `timestamptz` keeps microseconds
-    // and a `Date` truncates to milliseconds, so an insert and an update a few
-    // hundred microseconds apart read back as the same instant — which made this
-    // assertion pass or fail depending on how busy the machine was.
+    // Compared in Postgres: `timestamptz` keeps microseconds, a JS `Date`
+    // truncates to milliseconds, so a JS comparison was flaky.
     const { rows } = await pool.query<{
       moved: boolean
       created_held: boolean

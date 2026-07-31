@@ -4,12 +4,8 @@ import { err, isErr, ok, type Result } from "@domain/shared/result"
 import type { auth as appAuth, Role } from "./auth"
 
 /**
- * Two failures, deliberately distinct.
- *
- * `Unauthenticated` is "who are you" and `Forbidden` is "not for you".
- * Collapsing them into one status is a common shortcut and a real API-design
- * error: a client that cannot tell them apart cannot know whether signing in
- * would help.
+ * Two distinct failures: `Unauthenticated` is "who are you", `Forbidden` is
+ * "not for you" — a client must be able to tell whether signing in would help.
  */
 export type AuthFailure =
   | { readonly code: "Unauthenticated"; readonly message: string }
@@ -36,23 +32,13 @@ const STATUS: Record<AuthFailure["code"], number> = {
 }
 
 /**
- * The one place a guard failure becomes HTTP.
- *
- * The body carries the code and a generic sentence and nothing else — naming
- * the signed-in account or the role that would have worked tells an
- * unauthorised caller about the system.
+ * The one place a guard failure becomes HTTP. The body carries a code and a
+ * generic sentence only — naming the account or the required role leaks.
  */
 export const toResponse = (failure: AuthFailure): Response =>
-  // Through `errorResponse` rather than building the envelope here. Two places
-  // that both know the wire shape are two places that can stop agreeing about
-  // it, and a client parsing `error.code` would find one endpoint that spelled
-  // it differently.
   errorResponse(failure.code, failure.message, STATUS[failure.code])
 
-/**
- * Built as a factory for the same reason `auth` is: a test points the guards at
- * `smartpackage_test` instead of the development database.
- */
+/** A factory so tests can point the guards at `smartpackage_test`. */
 export const createGuards = (auth: typeof appAuth) => {
   const requireSession = async (
     headers: Headers
@@ -62,12 +48,7 @@ export const createGuards = (auth: typeof appAuth) => {
     return session === null ? err(unauthenticated()) : ok(session)
   }
 
-  /**
-   * Roles are checked, never ranked. An admin is not implicitly an agent: if an
-   * administrator needs to store a package they are given the agent role, which
-   * is a decision someone makes rather than a privilege that leaks in through a
-   * hierarchy nobody wrote down.
-   */
+  /** Roles are checked, never ranked: an admin is not implicitly an agent. */
   const requireRole = async (
     headers: Headers,
     allowed: Role | readonly Role[]

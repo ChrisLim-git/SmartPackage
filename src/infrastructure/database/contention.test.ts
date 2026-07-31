@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm"
 
 import { OrdinalFitService } from "@domain/services/ordinal-fit-service"
+import { RetrievePackageService } from "@domain/services/retrieve-package-service"
 import { SmallestFitFirstService } from "@domain/services/smallest-fit-first-service"
 import { StorePackageService } from "@domain/services/store-package-service"
+import { TieredDailyRateFeeService } from "@domain/services/tiered-daily-rate-fee-service"
 import { isErr, isOk } from "@domain/shared/result"
 import { PackageSize } from "@domain/utils/size"
 
@@ -19,27 +21,19 @@ import { unwrap } from "@/utils/unwrap"
 import { UuidV7Generator } from "@/utils/uuid-v7-generator"
 
 import { locker } from "./schema/locker"
+import { feeTier, pricingConfig } from "./schema/pricing"
 import { LockerRepository } from "./repositories/locker-repository"
 import { LockerSizeRepository } from "./repositories/locker-size-repository"
+import { PricingRepository } from "./repositories/pricing-repository"
 import { StationRepository } from "./repositories/station-repository"
 import { UnitOfWork } from "./unit-of-work"
 
 /**
- * The locker invariant under genuine parallelism: **at most one package occupies
- * a locker at any time.** This is the one test the whole concurrency design
- * exists for.
- *
- * Twenty requests through a pool of twenty, so twenty transactions really do
- * overlap — through the default pool of four this would be a test of four-way
- * contention and a queue. Isolation is by truncation rather than by wrapping each
- * case in a transaction, because a wrapping transaction would serialise the very
- * thing under test.
- *
- * Real Postgres, never PGlite. Measured against the same read-then-write claim:
- * real Postgres double-books, PGlite double-books nothing — its single WASM
- * backend serialises every transaction, so `SKIP LOCKED` never skips and a broken
- * claim passes. A suite that goes green against genuinely broken code is worse
- * than no suite.
+ * The locker invariant under real parallelism: at most one package per locker.
+ * Pool width 20 so twenty transactions genuinely overlap; isolation by
+ * truncation, because a wrapping transaction would serialise the contention
+ * under test. Real Postgres, never PGlite — PGlite serialises transactions, so
+ * `SKIP LOCKED` never skips and a broken claim goes green.
  */
 const { pool, db } = createTestDb({ max: 20 })
 
@@ -77,6 +71,14 @@ const barrier = (participants: number) => {
   }
 }
 
+/** File-level, so it runs after both describes — the pool dies exactly once. */
+afterAll(async () => {
+  await pool.query("DELETE FROM fee_tier")
+  await pool.query("DELETE FROM pricing_config")
+  await clearNetwork(pool)
+  await pool.end()
+})
+
 describe("storing packages under contention", () => {
   let network: Network
 
@@ -92,7 +94,7 @@ describe("storing packages under contention", () => {
     network = await seedNetwork(pool, db, counts)
   }
 
-  /** Any locker holding more than one stored parcel — the invariant, in SQL. */
+  /** The invariant, in SQL: any locker holding more than one stored parcel. */
   const doubleBooked = async () => {
     const { rows } = await pool.query(
       `SELECT locker_id, count(*) AS stored
@@ -127,13 +129,7 @@ describe("storing packages under contention", () => {
     )
   }
 
-  afterAll(async () => {
-    await clearNetwork(pool)
-    await pool.end()
-  })
-
-  // Five consecutive runs: a concurrency test that passes once has shown you one
-  // interleaving, and the one that matters may be the second.
+  // Five runs: one pass shows only one interleaving.
   it.each([1, 2, 3, 4, 5])(
     "gives twenty agents exactly three lockers, and refuses seventeen (run %i)",
     async () => {
@@ -150,12 +146,8 @@ describe("storing packages under contention", () => {
 
       expect(winners).toHaveLength(3)
       expect(refused).toHaveLength(CONCURRENT - 3)
-      // Every loser is told the ordinary thing rather than an error: from where
-      // the agent is standing, losing a race is a station with nothing free.
       expect(new Set(refused)).toEqual(new Set(["NoSuitableLockerAvailable"]))
 
-      // Three lockers, three winners, three different doors — and three different
-      // codes, which the partial unique index is what actually guarantees.
       expect(new Set(winners.map((won) => won.lockerLabel)).size).toBe(3)
       expect(new Set(winners.map((won) => won.pickupCode)).size).toBe(3)
 
@@ -171,9 +163,7 @@ describe("storing packages under contention", () => {
       Array.from({ length: 3 }, () => storePackage().execute(command("L")))
     )
 
-    // `SKIP LOCKED` skips a *locked* row, never a free one. Three requests for
-    // three lockers yielding two winners would mean the claim was trading
-    // capacity for a safety it already has.
+    // `SKIP LOCKED` skips locked rows, never free ones — safety must not cost capacity.
     expect(results.filter(isOk)).toHaveLength(3)
     expect(await availability()).toEqual({ occupied: 3 })
   })
@@ -190,8 +180,7 @@ describe("storing packages under contention", () => {
       .map((result) => result.value.lockerLabel)
       .sort()
 
-    // Both smalls and then the first medium, with both larges untouched: three
-    // concurrent small packages do not scatter across the station.
+    // Smallest-fit ordering holds under load: both smalls, then the first medium.
     expect(taken).toEqual(["M1", "S1", "S2"])
     expect(await availability()).toEqual({ available: 3, occupied: 3 })
   })
@@ -204,10 +193,8 @@ describe("storing packages under contention", () => {
       network.stationId
     )
 
-    // The claim writes the fit rule in SQL — `s.rank >= $1 ORDER BY s.rank, label`
-    // — while the domain writes it as `SmallestFitFirstService`. Two expressions
-    // of one rule can drift, and this is the assertion that they have not: the
-    // SQL's three winners are the policy's first three picks.
+    // The fit rule exists twice — as SQL in the claim and as
+    // `SmallestFitFirstService` in the domain — this asserts they have not drifted.
     let candidates = free
     const policyPicks: string[] = []
     for (let pick = 0; pick < 3; pick += 1) {
@@ -239,17 +226,8 @@ describe("storing packages under contention", () => {
     )
     const readingDone = barrier(CONCURRENT)
 
-    /**
-     * The implementation `claimSmallestFitting` exists to replace: read the free
-     * lockers, pick one, write to it.
-     *
-     * The barrier makes the failure a property of the *pattern* rather than of
-     * timing luck — every caller finishes reading before any caller writes, which
-     * is an interleaving real concurrency produces sometimes and this test needs
-     * every time. Hoping for the race instead would give a case that passes on a
-     * fast machine and fails in CI, and a flaky concurrency test teaches you to
-     * ignore a red suite.
-     */
+    // Barrier: every caller reads before any writes, so the double-book is
+    // deterministic, not timing luck.
     const claimNaively = (): Promise<string | null> =>
       db.transaction(async (tx) => {
         const free = await new LockerRepository(tx).findAvailableAtStation(
@@ -277,10 +255,6 @@ describe("storing packages under contention", () => {
       )
     ).filter((label): label is string => label !== null)
 
-    // The measurement that makes the atomic claim evidence rather than an
-    // assertion about itself: the same station, the same requests, and the naive
-    // pattern hands one locker to several agents. Each of those is a parcel
-    // dropped into a door somebody else's parcel is already behind.
     expect(claimed.length).toBeGreaterThan(3)
     expect(new Set(claimed).size).toBeLessThan(claimed.length)
   })
@@ -306,9 +280,87 @@ describe("storing packages under contention", () => {
       )
     ).filter((won) => won !== null)
 
-    // Same station, same twenty callers, same overlap. Three winners, three
-    // distinct doors, and no caller waiting on a row it was going to lose.
+    // Same overlap, atomic claim: three winners, three distinct doors.
     expect(claimed).toHaveLength(3)
     expect(new Set(claimed.map((won) => won.label)).size).toBe(3)
   })
+})
+
+/**
+ * The collection side: a pickup code opens a locker once. The row lock in
+ * `findStoredByCodeHash` is what prevents a double-collection.
+ */
+describe("collecting a package under contention", () => {
+  let network: Network
+
+  const retrievePackage = () =>
+    new RetrievePackageService({
+      pricing: new PricingRepository(db),
+      fees: new TieredDailyRateFeeService(),
+      hasher,
+      clock,
+      uow: new UnitOfWork(db, ids),
+    })
+
+  const storeCommand = () => ({
+    stationId: network.stationId,
+    recipient: { name: "Ada Lovelace", email: "ada@fixture.test" },
+    packageSizeCode: "L",
+    audit: { actingUserId: network.agentId },
+  })
+
+  const seed = async () => {
+    await pool.query("DELETE FROM fee_tier")
+    await pool.query("DELETE FROM pricing_config")
+    await clearNetwork(pool)
+    network = await seedNetwork(pool, db, { L: 1 })
+
+    await db
+      .insert(pricingConfig)
+      .values({ baseRatePerDay: "2.00", currencyCode: "AUD" })
+    await db.insert(feeTier).values([
+      { fromDay: 1, toDay: 5, multiplierHundredths: 100 },
+      { fromDay: 6, toDay: 10, multiplierHundredths: 200 },
+      { fromDay: 11, toDay: null, multiplierHundredths: 300 },
+    ])
+  }
+
+  // Five runs: one pass shows only one interleaving.
+  it.each([1, 2, 3, 4, 5])(
+    "opens one door for twenty holders of one code (run %i)",
+    async () => {
+      await seed()
+
+      const { pickupCode } = unwrap(
+        await storePackage().execute(storeCommand())
+      )
+
+      const results = await Promise.all(
+        Array.from({ length: CONCURRENT }, () =>
+          retrievePackage().execute({
+            pickupCode,
+            audit: { actingUserId: null },
+          })
+        )
+      )
+
+      const winners = results.filter(isOk)
+      const refused = results.filter(isErr).map((result) => result.error.code)
+
+      // A lost race answers exactly like a wrong code — no leakage by design.
+      expect(winners).toHaveLength(1)
+      expect(refused).toHaveLength(CONCURRENT - 1)
+      expect(new Set(refused)).toEqual(new Set(["InvalidPickupRequest"]))
+
+      // Collected and invoiced exactly once.
+      const { rows } = await pool.query(
+        `SELECT status, fee_charged FROM package`
+      )
+      expect(rows).toEqual([{ status: "retrieved", fee_charged: "2.00" }])
+
+      // Released and reusable: the station's only locker takes the next parcel.
+      const next = await storePackage().execute(storeCommand())
+      expect(isOk(next)).toBe(true)
+    }
+  )
 })

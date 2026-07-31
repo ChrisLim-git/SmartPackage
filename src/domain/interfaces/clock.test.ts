@@ -1,10 +1,6 @@
 import { AdvanceableClock, FixedClock } from "@/utils/fake-clocks"
 
-/**
- * The contract every `Clock` implementation must keep, exercised through the
- * two test doubles. `SystemClock` is covered in infrastructure, where it can
- * actually read the machine clock.
- */
+/** Contract for the `Clock` test doubles; `SystemClock` is covered in infrastructure. */
 describe("FixedClock", () => {
   it("returns the same instant however often it is asked", () => {
     const instant = new Date("2026-01-01T00:00:00.000Z")
@@ -54,8 +50,7 @@ describe("AdvanceableClock", () => {
   it("throws on a duration it does not understand, rather than not moving", () => {
     const clock = new AdvanceableClock(new Date("2026-01-01T00:00:00.000Z"))
 
-    // A clock that silently ignores `advanceBy("7 days")` makes a fee test
-    // pass for the wrong reason.
+    // Silent ignore would make fee tests pass for the wrong reason.
     expect(() => clock.advanceBy("7 days")).toThrow()
     expect(() => clock.advanceBy("d7")).toThrow()
     expect(() => clock.advanceBy("")).toThrow()

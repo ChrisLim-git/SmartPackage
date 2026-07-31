@@ -15,12 +15,8 @@ export type FeeTierAttributes = {
 }
 
 /**
- * One band of the fee table: days `fromDay` to `toDay`, charged at `multiplier`
- * times the base rate.
- *
- * The multiplier is stored as an integer number of hundredths rather than as
- * the decimal it was given, so summing bands never touches a float and the one
- * rounding step stays where `Money` puts it — on the final total.
+ * One band of the fee table: days `fromDay`–`toDay` at `multiplier` × base rate.
+ * Multiplier is stored as integer hundredths so summing bands never touches a float.
  */
 export class FeeTier {
   private constructor(
@@ -53,13 +49,9 @@ export class FeeTier {
       )
     }
 
-    // Decided on the decimal the caller wrote, not on the float it became.
-    // `2.2 * 100` is 220.00000000000003, so any tolerance tight enough to
-    // catch a third decimal place also rejects 2.2 — 255 of the 2000
-    // two-decimal multipliers, silently, and a x2.2 band cannot be configured.
+    // Validated on the decimal string, not the float: `2.2 * 100` is
+    // 220.00000000000003, so an epsilon check would reject valid multipliers.
     if (!MULTIPLIER_PATTERN.test(String(multiplier))) {
-      // More precision than the currency has would need a rounding rule that
-      // nobody has stated.
       return err(
         malformedInput(
           "fee tier",
@@ -73,14 +65,7 @@ export class FeeTier {
     )
   }
 
-  /**
-   * Rebuilds a tier from the hundredths a repository read back.
-   *
-   * The database stores what this object stores, so going in through `create`
-   * would mean dividing by 100 to produce a decimal that is immediately
-   * multiplied by 100 again — a float round trip for a number that was already
-   * the right integer.
-   */
+  /** Rebuilds a tier from stored hundredths, avoiding a float round trip through `create`. */
   static fromHundredths(attributes: {
     readonly fromDay: number
     readonly toDay: number | null

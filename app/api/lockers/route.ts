@@ -6,12 +6,7 @@ import { isErr } from "@domain/shared/result"
 import { toResponse } from "@infrastructure/external/auth/guard"
 import { guards, installLocker, lockers } from "@infrastructure/container"
 
-/**
- * A station id reaches this handler as text from a query string, and every
- * value in the database is a uuid. Letting a non-uuid through means Postgres
- * answers "invalid input syntax", which surfaces as a 500 — the server
- * reporting a fault for what is a caller's typo.
- */
+// A non-uuid reaching Postgres surfaces "invalid input syntax" as a 500 for a caller's typo.
 const stationIdSchema = z.uuid("stationId must be a uuid")
 
 const createLockerSchema = z.object({
@@ -40,25 +35,21 @@ export async function GET(request: Request) {
     )
   }
 
-  // No station named: every locker in the network, which is what an admin
-  // landing on the page before choosing a station wants to see.
+  // No station named: every locker in the network.
   return Response.json(
     (await lockers.findAllWithAvailability()).map(toLockerDto)
   )
 }
 
 export async function POST(request: Request) {
-  // Creating a locker is an administrator's job. An agent stores packages in
-  // lockers; installing one is a different question and a different role.
   const session = await guards.requireRole(request.headers, "admin")
   if (isErr(session)) return toResponse(session.error)
 
   const details = await parseBody(request, createLockerSchema)
   if (!details.ok) return details.response
 
-  // Whether the size exists, whether the station exists and whether the label is
-  // free are all decisions about the estate, so they belong to the domain. This
-  // handler only says which status each answer becomes.
+  // Size/station existence and label uniqueness are domain decisions; this
+  // handler only maps each answer to a status.
   const installed = await installLocker.install({
     ...details.data,
     audit: { actingUserId: session.value.user.id },

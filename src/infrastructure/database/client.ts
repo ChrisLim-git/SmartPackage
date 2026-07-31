@@ -4,14 +4,9 @@ import { Pool } from "pg"
 import * as schema from "./schema"
 
 /**
- * One pool for the process. Next.js re-evaluates modules on hot reload, so
- * without the globalThis guard dev leaks a pool per reload until Postgres
- * refuses new connections.
- *
- * The driver is node-postgres deliberately. `postgres.js` turns on prepared
- * statements by default, which is a footgun behind a pooler, and
- * `@vercel/postgres` is HTTP, so it cannot hold a row lock across statements —
- * which the atomic locker claim needs.
+ * One pool for the process; the globalThis guard stops hot reload leaking a
+ * pool per reload. node-postgres specifically: the atomic locker claim needs a
+ * driver that can hold a row lock across statements.
  */
 const globalForDb = globalThis as unknown as { __pool?: Pool }
 
@@ -24,10 +19,8 @@ export const pool =
     connectionTimeoutMillis: 5_000,
   })
 
-// Development only, and deliberately not "anything but production": under test
-// the cache would outlive the module registry Jest gives each suite, so a suite
-// that closed the pool in `afterAll` would leave the next one holding a dead
-// one. Hot reload is the problem this solves, and hot reload is a dev thing.
+// Development only: under test the cached pool would outlive Jest's per-suite
+// module registry, leaving later suites holding a closed pool.
 if (process.env.NODE_ENV === "development") {
   globalForDb.__pool = pool
 }

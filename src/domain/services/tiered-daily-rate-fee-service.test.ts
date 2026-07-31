@@ -60,17 +60,15 @@ describe("TieredDailyRateFeeService", () => {
     })
 
     it("charges a seven-day stay piecewise, at 9x base and not 14x", () => {
-      // The differentiator. Seven days is 5·1·2 + 2·2·2 = 18.00, accumulated
-      // band by band. Reading the rule as "apply the highest band reached to
-      // the whole stay" gives 7·2·2 = 28.00, which is the common wrong answer.
+      // Piecewise: 5·1·2 + 2·2·2 = 18.00; the highest band applied to the
+      // whole stay would give 28.00.
       expect(feeFor(7)).toBe("18.00")
     })
   })
 
   describe("pricing that is data, not code", () => {
     it("gives a grace period when the first band is free", () => {
-      // Resolves the specification's own contradiction without a code change:
-      // the grace period is just a leading tier with a zero multiplier.
+      // A grace period is just a leading tier with a zero multiplier.
       const withGrace = pricing("2.00", [tier(1, 2, 0), tier(3, null, 1)])
 
       expect(feeFor(1, withGrace)).toBe("0.00")
@@ -100,8 +98,7 @@ describe("TieredDailyRateFeeService", () => {
     })
 
     it("rounds half up once, on the total, not once per band", () => {
-      // 1 day at x0.5 of 0.05 is 0.025. Rounding per band would charge 0.03
-      // and then keep charging it; rounding the total charges 0.05 for two.
+      // 1 day at x0.5 of 0.05 is 0.025; the total rounds once, not per band.
       const oddRate = pricing("0.05", [tier(1, null, 0.5)])
 
       expect(feeFor(1, oddRate)).toBe("0.03")
@@ -109,12 +106,7 @@ describe("TieredDailyRateFeeService", () => {
     })
   })
 
-  /**
-   * The total alone cannot be explained to the person paying it. A stay that
-   * crossed a boundary was charged at more than one rate, and a single "rate"
-   * field can only describe one of them — so the screen would state an amount
-   * its own arithmetic contradicts.
-   */
+  /** Bands must be reported: a stay crossing a boundary was charged at more than one rate. */
   describe("the bands a stay was charged at", () => {
     it("names each band the stay reached, with the rate that band charges", () => {
       expect(bandsFor(7)).toEqual([

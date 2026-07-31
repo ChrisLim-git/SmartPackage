@@ -2,14 +2,11 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { isErr } from "@domain/shared/result"
-import { auth } from "@infrastructure/external/auth/auth"
-import { createGuards } from "@infrastructure/external/auth/guard"
+import { guards } from "@infrastructure/container"
 import { LockerAdmin } from "@/components/locker-admin"
 
-const { requireRole } = createGuards(auth)
-
 export default async function AdminPage() {
-  const gate = await requireRole(await headers(), "admin")
+  const gate = await guards.requireRole(await headers(), "admin")
 
   // A page redirects where a route handler would answer 401/403 — the same
   // guard, a different edge. The two codes cannot share a destination:

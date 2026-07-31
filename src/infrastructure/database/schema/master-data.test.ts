@@ -8,12 +8,8 @@ import { station } from "./station"
 
 const { pool, db } = createTestDb()
 
-/**
- * Every table the domain owns. BetterAuth's four are deliberately absent from
- * the audit-column and soft-delete conventions — an account is not a domain
- * table. They are held to the key convention only, which is asserted
- * separately, because a foreign key from `created_by` has to match.
- */
+// Every table the domain owns. BetterAuth's four are held to the key
+// convention only, asserted separately.
 const DOMAIN_TABLES = [
   "customer",
   "station",
@@ -78,9 +74,8 @@ describe("the master data schema", () => {
       const id = (await columnsOf(table)).find((c) => c.column_name === "id")
 
       expect(id?.data_type).toBe("uuid")
-      // A `uuid` column says nothing about which version fills it. `uuidv7()`
-      // is the half that makes the key time-sortable, so assert the default
-      // rather than the type alone.
+      // The `uuidv7()` default is what makes the key time-sortable — assert
+      // it, not just the type.
       expect(id?.column_default).toBe("uuidv7()")
       expect(await primaryKeyOf(table)).toEqual(["id"])
     })
@@ -90,8 +85,7 @@ describe("the master data schema", () => {
       async (table) => {
         const id = (await columnsOf(table)).find((c) => c.column_name === "id")
 
-        // BetterAuth supplies the id on every write it makes, but a seed or a
-        // migration inserting here gets the column default — and a v4 sitting
+        // A seed or migration inserting here gets the column default — a v4
         // beside v7s is the convention quietly broken.
         expect(id?.data_type).toBe("uuid")
         expect(id?.column_default).toBe("uuidv7()")
@@ -109,9 +103,7 @@ describe("the master data schema", () => {
     it("leaves BetterAuth's tables alone", async () => {
       const present = (await columnsOf("user")).map((c) => c.column_name)
 
-      // No audit columns bolted on, no soft delete. An account is not a domain
-      // table, and editing the generated schema invites drift on every
-      // regeneration.
+      // No audit columns, no soft delete — an account is not a domain table.
       expect(present).not.toContain("deleted_at")
       expect(present).not.toContain("created_by")
     })
@@ -131,9 +123,8 @@ describe("the master data schema", () => {
     it.each(DOMAIN_TABLES)(
       "gives every numeric column on %s the same precision and scale",
       async (table) => {
-        // A bare `numeric` is unconstrained, and two money columns of
-        // different scale round differently. The convention is one width
-        // everywhere, so assert the width — not merely the type.
+        // Two money columns of different scale round differently — assert the
+        // width, not merely the type.
         const money = (await columnsOf(table)).filter(
           (c) => c.data_type === "numeric"
         )
@@ -159,9 +150,7 @@ describe("the master data schema", () => {
           c.data_type.startsWith("timestamp")
         )
 
-        // Includes the three audit timestamps on every table, not just the
-        // domain's own `stored_at` / `retrieved_at`. A naive timestamp anywhere
-        // makes "how many days has this been stored" depend on server locale.
+        // A naive timestamp anywhere makes day arithmetic depend on server locale.
         expect(times.length).toBeGreaterThan(0)
         expect(
           times.filter((c) => c.data_type !== "timestamp with time zone")
@@ -195,8 +184,7 @@ describe("the master data schema", () => {
         .where(eq(pricingConfig.id, created.id))
         .returning()
 
-      // A string, not a number. `mode: "number"` would hand back 10.15 as a
-      // float and the exactness this whole design protects would be gone.
+      // A string, not a number — `mode: "number"` would float it.
       expect(typeof raised.baseRatePerDay).toBe("string")
       expect(raised.baseRatePerDay).toBe("10.15")
     })
@@ -238,8 +226,7 @@ describe("the master data schema", () => {
         .insert(locker)
         .values({ stationId: central.id, sizeId: size.id, label: "A1" })
 
-      // Named on the cause, not the message: Drizzle's own error reports the
-      // failed query, and the constraint that rejected it is one level down.
+      // Drizzle names the constraint on `error.cause`; the message is the failed query.
       await expect(
         db
           .insert(locker)
@@ -248,8 +235,7 @@ describe("the master data schema", () => {
         cause: { constraint: "locker_station_label_unique" },
       })
 
-      // The same label at another station is a different locker, and an agent
-      // reading a door only ever stands in one station at a time.
+      // The same label at another station is a different locker.
       const [elsewhere] = await db
         .insert(locker)
         .values({ stationId: harbour.id, sizeId: size.id, label: "A1" })

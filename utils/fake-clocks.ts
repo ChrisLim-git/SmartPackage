@@ -14,8 +14,7 @@ export class FixedClock implements Clock {
   constructor(private readonly instant: Date) {}
 
   now(): Date {
-    // A copy: `Date` is mutable, and a caller that does `clock.now().setHours(…)`
-    // would otherwise move everyone else's clock too.
+    // A copy: `Date` is mutable, and a mutating caller would move everyone's clock.
     return new Date(this.instant.getTime())
   }
 }
@@ -37,8 +36,7 @@ export class AdvanceableClock implements Clock {
     const match = DURATION_PATTERN.exec(duration)
 
     if (match === null) {
-      // Ignoring an unparseable duration would leave a fee test asserting the
-      // first day's rate and calling it a seven-day stay.
+      // Silently ignoring a bad duration would leave a fee test asserting the wrong stay.
       throw new Error(
         `AdvanceableClock cannot read "${duration}" — use a form like "7d", "24h", "5m" or "30s"`
       )

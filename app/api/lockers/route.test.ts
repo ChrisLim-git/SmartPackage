@@ -4,19 +4,8 @@ import { createTestDb } from "@/utils/test-db"
 
 const { pool, db } = createTestDb()
 
-/**
- * The handlers, with the session *looked up* rather than *earned*.
- *
- * Signing a user up and signing them back in to obtain a cookie would test
- * BetterAuth, which `auth.test.ts` already does — here it would be a slow
- * fixture standing between this test and the thing it is actually asserting.
- *
- * What is stubbed is only the session lookup. `createGuards` still runs for
- * real, so the 401-versus-403 decision is the real one and the handler is
- * genuinely wired to it; a stubbed guard would be this test asserting its own
- * mock. Everything below the handler — validation, the repository, the unique
- * index — is real too.
- */
+// Only the session lookup is stubbed. `createGuards`, validation, the
+// repository and the unique index all run for real, so 401-vs-403 is the real decision.
 const currentSession: { value: unknown } = { value: null }
 
 jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({
@@ -94,9 +83,7 @@ describe("/api/lockers", () => {
       const body = await response.json()
 
       expect(response.status).toBe(200)
-      // The contract, not the count: a `Locker` serialised directly would put
-      // a value object's private shape on the wire, one rename from breaking
-      // every client. Any role may read — an agent needs to see availability.
+      // Asserts the wire shape, not the entity; any role may read.
       expect(body).toContainEqual(
         expect.objectContaining({
           label: "R1",
@@ -113,8 +100,7 @@ describe("/api/lockers", () => {
         request("http://test/api/lockers?stationId=not-a-uuid")
       )
 
-      // Postgres would call this "invalid input syntax" and the server would
-      // report a fault for what is the caller's typo.
+      // Unchecked, Postgres's "invalid input syntax" becomes a 500 for a caller typo.
       expect(response.status).toBe(400)
       expect((await response.json()).error.message).toMatch(/uuid/)
     })
@@ -175,9 +161,7 @@ describe("/api/lockers", () => {
     it("answers 400, not 500, for a size code that is not on the ladder", async () => {
       signedInAs("admin")
 
-      // The repository can only answer "no such size" by throwing. Unchecked
-      // here that is the server reporting a fault for a caller's typo — the
-      // same reasoning as the `stationId` case above.
+      // The repository answers "no such size" by throwing; unchecked that is a 500.
       const response = await POST(
         request("http://test/api/lockers", {
           stationId,
@@ -195,9 +179,7 @@ describe("/api/lockers", () => {
     it("answers 404, not 500, for a station that does not exist", async () => {
       signedInAs("admin")
 
-      // A well-formed uuid naming no station used to reach the foreign key and
-      // surface as a server error. The station is checked before the insert, so
-      // the caller is told what is actually wrong.
+      // The station is checked before the insert; the FK violation used to be a 500.
       const response = await POST(
         request("http://test/api/lockers", {
           stationId: "019fb1ad-d64b-7fe4-bde0-000000000000",
@@ -224,8 +206,7 @@ describe("/api/lockers", () => {
         "SELECT created_by FROM locker WHERE id = $1",
         [created.id]
       )
-      // The audit context reached the repository from the session, which is
-      // the whole path `AuditContext` exists for.
+      // Proves `AuditContext` carried the session user to the repository.
       expect(row.rows[0].created_by).toBe(ADMIN_ID)
     })
   })

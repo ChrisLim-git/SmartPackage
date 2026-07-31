@@ -24,15 +24,8 @@ export type StorePackageAttributes = {
 }
 
 /**
- * A parcel in a locker. Stored once, collected once.
- *
- * `retrieved` is terminal, and that one fact covers two of the invalid
- * collection scenarios the specification leaves unenumerated: replaying a
- * pickup code, and collecting the same package twice.
- *
- * The pickup code is held only as a hash. It is a bearer credential for a
- * physical object, so plaintext at rest would make one `SELECT` a master key to
- * every occupied locker.
+ * A parcel in a locker; stored once, collected once — `retrieved` is terminal.
+ * The pickup code is held only as a hash; plaintext is never at rest.
  */
 export class Package {
   private constructor(
@@ -68,8 +61,6 @@ export class Package {
         attributes.lockerId,
         attributes.hasher.hash(attributes.code),
         "stored",
-        // From the Clock interface, never `new Date()`: a seven-day stay has to be
-        // testable in a millisecond.
         attributes.clock.now(),
         null,
         null
@@ -78,13 +69,8 @@ export class Package {
   }
 
   /**
-   * Rebuilds a parcel that already exists, in whatever state it was left in.
-   *
-   * Separate from `store` for the same reason `Locker.rehydrate` is separate from
-   * `Locker.create`: a stored package is always uncollected and unbilled, so
-   * reading a collected one back through `store` would hand it back stored — and
-   * its code would open the locker a second time. The hash arrives already
-   * hashed, because the plaintext is gone by then.
+   * Rebuilds a persisted parcel in whatever state it was left in; `store` only
+   * makes `stored` ones. The hash arrives already hashed.
    */
   static rehydrate(attributes: {
     readonly id: string
@@ -122,9 +108,8 @@ export class Package {
   }
 
   /**
-   * Checked separately from the code so a right-code-wrong-locker attempt is
-   * distinguishable in a log and a test, even though it flattens to the same
-   * response as every other rejected collection.
+   * Separate from the code check so a right-code-wrong-locker attempt is
+   * distinguishable in logs, though it flattens to the same response.
    */
   matchesLocker(lockerId: string): boolean {
     return this.lockerId === lockerId
@@ -154,7 +139,7 @@ export class Package {
         this.lockerId,
         this.pickupCodeHash,
         "retrieved",
-        // Kept, not overwritten: the audit trail has to survive collection.
+        // Kept, not overwritten: the audit trail survives collection.
         this.storedAt,
         at,
         fee

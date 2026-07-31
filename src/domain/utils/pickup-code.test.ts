@@ -20,26 +20,18 @@ describe("PickupCode", () => {
   })
 
   it("folds what a phone keyboard does to a typed code", () => {
-    // Lower case by default, and a trailing space from a paste. Both mean the
-    // same code, and refusing them would be refusing a correct answer.
     expect(code("k4m9pt").toString()).toBe("K4M9PT")
     expect(code(" K4M9PT ").toString()).toBe("K4M9PT")
     expect(code("k4m9pt").equals(code("K4M9PT"))).toBe(true)
   })
 
   it("stays a string, so nothing can parse it into a number", () => {
-    // The sneaky one, and the reason the type exists: anything treating a code as
-    // numeric turns "234567" into arithmetic and loses codes with letters in
-    // them entirely.
     expect(code("234567").toString()).toBe("234567")
     expect(typeof code("234567").toString()).toBe("string")
   })
 
   it("rejects the characters deliberately left out of the alphabet", () => {
-    // 0/O and 1/I/L are the pairs a person misreads off a slip, and U is left out
-    // so six random characters cannot spell something unrepeatable. None is ever
-    // issued, so none is accepted — remapping O to 0 would turn one typo into a
-    // different valid code.
+    // Excluded characters are never issued, so never accepted; no remapping of O to 0.
     for (const value of [
       "K4M9P0",
       "K4M9PO",
@@ -90,8 +82,6 @@ describe("StubPickupCodeGenerator", () => {
   })
 
   it("throws once the queue is exhausted rather than repeating itself", () => {
-    // A test that outruns its stub has stopped testing what it says it tests.
-    // Failing loudly is the only useful behaviour here.
     const generator = new StubPickupCodeGenerator(["AAAAAA"])
     generator.generate()
 

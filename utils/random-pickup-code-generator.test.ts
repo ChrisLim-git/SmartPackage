@@ -9,8 +9,7 @@ describe("RandomPickupCodeGenerator", () => {
   const generator = new RandomPickupCodeGenerator()
 
   it("only ever produces codes the value object accepts", () => {
-    // The alphabet excludes 0, 1, I, L, O and U, and a generator that drew from
-    // a wider one would issue codes a customer's typo could never match.
+    // The alphabet excludes 0, 1, I, L, O and U; a wider draw would issue unmatchable codes.
     const allowed = new RegExp(
       `^[${PICKUP_CODE_ALPHABET}]{${PICKUP_CODE_LENGTH}}$`
     )
@@ -27,8 +26,7 @@ describe("RandomPickupCodeGenerator", () => {
       )
     )
 
-    // 2400 draws over 30 symbols: anything much short of the whole alphabet means
-    // the draw is skewed — a modulo over a wider random, or a fixed seed.
+    // 2400 draws over 30 symbols: short of the whole alphabet means a skewed draw.
     expect(seen.size).toBe(PICKUP_CODE_ALPHABET.length)
   })
 

@@ -26,13 +26,7 @@ export type StorePackageCommand = {
     readonly email: string
     readonly phone?: string | null
   }
-  /**
-   * The size **code** an agent picked, not a value object.
-   *
-   * The ladder is master data, so turning a code into a size is a lookup the
-   * domain can do and the route cannot — which is what keeps the handler a strip
-   * that guards, validates, delegates and maps.
-   */
+  /** The size code an agent picked; resolving it to a size is the domain's lookup. */
   readonly packageSizeCode: string
   readonly audit: AuditContext
 }
@@ -45,10 +39,8 @@ export type StoredPackage = {
 }
 
 /**
- * The repositories that must share a transaction arrive through the
- * `UnitOfWork`, not as constructor arguments beside it. Injecting both would put
- * two handles on the same table in one service, and the second write to escape
- * the transaction would be silent.
+ * Repositories that must share a transaction arrive through the `UnitOfWork`,
+ * never as constructor arguments beside it.
  */
 export type StorePackageDependencies = {
   readonly stations: StationRepository
@@ -67,13 +59,8 @@ export type StorePackageFailure =
   StationNotFound | NoSuitableLockerAvailable | MalformedInput
 
 /**
- * Level 1, orchestrated: an agent hands over a package and gets back a locker
- * to put it in and a code to pass on.
- *
- * A domain service rather than a use case in a layer above, because the
- * repository and `UnitOfWork` contracts are declared in the domain — so this
- * class coordinates a whole flow while importing nothing outside it, and its
- * tests run against in-memory fakes in microseconds.
+ * Stores a package: claims a locker, records the parcel, and returns the
+ * locker label with the one-time pickup code.
  */
 export class StorePackageService {
   constructor(private readonly dependencies: StorePackageDependencies) {}
@@ -84,9 +71,7 @@ export class StorePackageService {
     const { stations, codes, hasher, ids, clock, uow } = this.dependencies
 
     if ((await stations.findById(command.stationId)) === null) {
-      // Checked before anything is claimed: a package cannot be stored at a
-      // station that does not exist, and saying so is not the same answer as
-      // "the station is full".
+      // Checked before anything is claimed: "no station" is not "station full".
       return err(stationNotFound(command.stationId))
     }
 
@@ -95,19 +80,8 @@ export class StorePackageService {
 
     return uow.run<Result<StoredPackage, StorePackageFailure>>(
       async ({ lockers, packages, customers }) => {
-        // The claim is inside this transaction on purpose, and it is the one place
-        // that decision is visible: claiming a locker and recording the parcel in
-        // it commit together, or neither does. Claim-then-commit-then-insert would
-        // leave a locker marked occupied with nothing inside it the first time an
-        // insert failed, and nothing to release it — a dead locker and a parcel
-        // the system never heard of. The row lock is held across two indexed
-        // single-row writes, and `SKIP LOCKED` means a concurrent agent takes the
-        // next locker rather than waiting behind this one.
-        //
-        // The locker comes first within the transaction, before the recipient
-        // exists, because it is the only contended resource: failing fast on it
-        // means a store that cannot happen leaves nothing behind, not even a
-        // customer row.
+        // The claim and the parcel write commit together or not at all. The
+        // locker is claimed first because it is the only contended resource.
         const locker = await lockers.claimSmallestFitting(
           command.stationId,
           size.value,
@@ -123,15 +97,8 @@ export class StorePackageService {
           command.audit
         )
 
-        // A code is the entire credential — the recipient types six characters and
-        // nothing else — so no two parcels awaiting collection may share one. The
-        // database refuses the duplicate; this loop is what turns that refusal
-        // into another code rather than a failed delivery.
-        //
-        // With 729 million codes over the domain's alphabet, a first collision
-        // needs tens of thousands of parcels in lockers at once, and a second in
-        // the same store is arithmetic nobody will see. The loop stays because the
-        // index is the thing that decides, not the odds.
+        // No two stored parcels may share a code; the unique index decides, and
+        // this loop turns a collision into another code.
         for (let attempt = 1; attempt <= CODE_ATTEMPTS; attempt += 1) {
           const code = codes.generate()
 
@@ -146,10 +113,7 @@ export class StorePackageService {
           })
 
           if (isErr(parcel)) {
-            // Unreachable: every field it validates was produced above. A throw
-            // rather than an `Err` because this would be a bug in this service,
-            // and because it rolls the claim back instead of committing a locker
-            // holding nothing.
+            // Unreachable: every field was produced above. The throw rolls the claim back.
             throw new Error(
               `a stored package could not be built: ${parcel.error.message}`
             )
@@ -164,10 +128,7 @@ export class StorePackageService {
           }
         }
 
-        // Every attempt collided. Against 729 million codes that means either the
-        // generator has stopped being random or the network is holding most of
-        // the code space — both are faults, and neither is something the agent
-        // can act on.
+        // Every attempt collided: a broken generator, not bad luck.
         throw new Error(
           `could not find an unused pickup code in ${CODE_ATTEMPTS} attempts`
         )
@@ -175,13 +136,7 @@ export class StorePackageService {
     )
   }
 
-  /**
-   * The code an agent chose, against the ladder master data actually holds.
-   *
-   * An unknown code is malformed input rather than a missing locker: the station
-   * may be wide open, and telling the caller it is full would be a lie about
-   * their own typo.
-   */
+  /** An unknown size code is malformed input, not a missing locker. */
   private async resolveSize(
     code: string
   ): Promise<Result<PackageSize, MalformedInput>> {
@@ -193,9 +148,7 @@ export class StorePackageService {
 
     if (isErr(match)) return match
 
-    // A locker's capacity and a package's requirement are deliberately not
-    // assignable to each other, so the ladder row is rebuilt as the one this
-    // flow needs rather than passed through.
+    // Capacity and requirement are not assignable, so the ladder row is rebuilt as a PackageSize.
     return PackageSize.create(match.value)
   }
 }

@@ -17,15 +17,7 @@ import { SystemClock } from "@/utils/system-clock"
 import { HmacPickupCodeHasher } from "@/utils/pickup-code-hasher"
 import { UuidV7Generator } from "@/utils/uuid-v7-generator"
 
-/**
- * Where the interfaces meet their implementations, and the only place that knows
- * both.
- *
- * A route handler asks for `storePackage`, not for a database. That is the whole
- * point of the inversion, and it stays true only if exactly one module does the
- * wiring — the moment a handler constructs its own repository, the layer boundary
- * is decoration.
- */
+/** Where the interfaces meet their implementations — the only module that wires both. */
 export const ids = new UuidV7Generator()
 export const clock = new SystemClock()
 export const codes = new RandomPickupCodeGenerator()
@@ -37,17 +29,11 @@ export const lockers = new LockerRepository(db)
 export const lockerSizes = new LockerSizeRepository(db)
 export const pricing = new PricingRepository(db)
 
-/**
- * The repositories above hold the pool; the ones inside a `run` hold the
- * transaction. A flow that writes more than one row takes the second kind, which
- * is why the services below are given the unit of work and not these.
- */
+// The repositories above hold the pool; repositories inside a `run` hold the
+// transaction — multi-write flows take the unit of work.
 export const uow = new UnitOfWork(db, ids)
 
-/**
- * No unit of work: installing a locker is a single insert. Handing this one a
- * transaction would suggest there is a second write to keep it company.
- */
+// No unit of work: installing a locker is a single insert.
 export const installLocker = new InstallLockerService({
   lockers,
   lockerSizes,

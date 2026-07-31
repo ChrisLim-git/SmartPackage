@@ -13,15 +13,12 @@ type LockerRow = typeof locker.$inferSelect
 type SizeRow = typeof lockerSize.$inferSelect
 
 /**
- * Extends the plain base rather than `EntityRepository`, because every read here
- * joins the size ladder: a locker without its size cannot answer what fits in
- * it, which is the only question the domain asks of one. Inheriting a
- * single-table `findById` would have meant a locker that reads back sizeless.
+ * Locker persistence. Extends the plain base, not `EntityRepository`: every
+ * read must join the size ladder, so single-table reads would be wrong.
  */
 export class LockerRepository extends BaseRepository<typeof locker> {
   protected readonly table = locker
 
-  /** `rebuild`, not `create`: a locker read back is whatever it was left as. */
   private toEntity(row: { locker: LockerRow; locker_size: SizeRow }): Locker {
     const size = this.rebuilt(
       LockerSize.create({
@@ -39,15 +36,13 @@ export class LockerRepository extends BaseRepository<typeof locker> {
         size,
         label: row.locker.label,
         status: row.locker.status,
-        // The locker table records *that* it is occupied; which package is in it
-        // is the package table's business, and only the collection path asks.
+        // Which package occupies it is the package table's business.
         currentPackageId: null,
       }),
       row.locker.id
     )
   }
 
-  /** Every read needs the size, so every read is the same join. */
   private selectLockers() {
     return this.query
       .select()
@@ -66,15 +61,11 @@ export class LockerRepository extends BaseRepository<typeof locker> {
       .limit(1)
 
     if (size === undefined) {
-      // A bug, not caller input: the route checks the code against the size
-      // ladder before it gets here, so reaching this line means the ladder
-      // changed underneath a request or a caller skipped the route.
+      // A bug, not caller input: the route validates the code before this.
       throw new Error(`no locker size is coded "${details.sizeCode}"`)
     }
 
-    // `onConflictDoNothing` rather than catching a Postgres error code: the
-    // unique index is the thing that decides, and reading its verdict from an
-    // empty result keeps the driver's error taxonomy out of this class.
+    // The unique index decides; an empty result is its verdict.
     const [row] = await this.query
       .insert(locker)
       .values({
@@ -126,36 +117,19 @@ export class LockerRepository extends BaseRepository<typeof locker> {
           this.visible
         )
       )
-      // Smallest first, then by label — the same order the selection policy
-      // would impose, so a caller reading this list sees the candidate it will
-      // be given.
+      // Smallest first, then by label — the selection policy's order.
       .orderBy(asc(lockerSize.rank), asc(locker.label))
 
     return rows.map((row) => this.toEntity(row))
   }
 
   /**
-   * One statement: pick the smallest free locker that fits and take it.
-   *
-   * The subquery holds a row lock — `FOR UPDATE OF l SKIP LOCKED` — so two agents
-   * storing at the same station in the same moment do not both read the same free
-   * locker and both write to it. `SKIP LOCKED` is what makes the loser take the
-   * *next* locker instead of waiting for a row it is going to lose anyway, which
-   * is why twenty concurrent stores against three lockers yield exactly three
-   * packages and seventeen honest refusals rather than a deadlock.
-   *
-   * A read followed by a write cannot do this, whatever it is wrapped in: both
-   * transactions see `available` at the same instant. That is why the interface
-   * has one method with a business name rather than a `find` and a `save`.
-   *
-   * The fit rule is expressed as `size.rank >= required` here, and as
-   * `OrdinalFitService` in the domain. That duplication is deliberate and it is
-   * the price of atomicity — a claim that consulted the domain would be a read
-   * and then a write again. `SmallestFitFirstService` orders candidates the same
-   * way (`rank` then `label`), so the two agree on which locker; the in-memory
-   * repository delegates to the real service precisely so a disagreement shows
-   * up as a failing domain test rather than as a locker chosen differently in
-   * production.
+   * Pick the smallest free fitting locker and take it, in one statement — a
+   * separate read and write would let two transactions see the same `available`
+   * row. `FOR UPDATE OF l SKIP LOCKED` makes a loser take the *next* locker
+   * instead of waiting on a row it will lose. The fit rule is duplicated here
+   * from the domain (`OrdinalFitService`) as the price of atomicity; a domain
+   * test asserts the two agree.
    */
   async claimSmallestFitting(
     stationId: string,
@@ -185,8 +159,7 @@ export class LockerRepository extends BaseRepository<typeof locker> {
 
     const claimed = claim.rows[0]
 
-    // Nothing free fits, or every candidate is locked by another store in
-    // flight. Both are ordinary outcomes, and neither is an error.
+    // Nothing free fits, or every candidate is locked — ordinary outcomes.
     return claimed === undefined ? null : this.findById(claimed.id)
   }
 
@@ -194,18 +167,12 @@ export class LockerRepository extends BaseRepository<typeof locker> {
     await this.query
       .update(locker)
       .set({ status: "available", updatedBy: actor.actingUserId })
-      // A soft-deleted locker is gone as far as every read is concerned, so a
-      // write must not reach it either — otherwise a decommissioned locker comes
-      // back advertised as available.
+      // Writes must skip soft-deleted rows too, or a decommissioned locker
+      // comes back advertised as available.
       .where(and(eq(locker.id, lockerId), this.visible))
   }
 
-  /**
-   * Every locker with its current status — L1's availability listing.
-   *
-   * Occupied lockers included, unlike `findAvailableAtStation`: an operator
-   * looking at a station needs to see it is full, not see an empty page.
-   */
+  /** Every locker with its current status, occupied ones included. */
   async findAllWithAvailability(stationId?: string): Promise<Locker[]> {
     const rows = await this.selectLockers()
       .where(

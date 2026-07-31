@@ -16,14 +16,7 @@ import { StorageDuration } from "../utils/storage-duration"
 import type { ChargedBand, StorageFeeService } from "./storage-fee-service"
 
 export type RetrievePackageCommand = {
-  /**
-   * Six characters, and the whole request.
-   *
-   * The recipient has a code in a message and nothing else — no account, no
-   * station, no locker number — so the code has to identify the parcel by itself.
-   * Asking for the locker number as well would mean a person standing in front of
-   * a wall of doors transcribing one before anything can happen.
-   */
+  /** The whole request: the code identifies the parcel on its own — no station, no locker number. */
   readonly pickupCode: string
   readonly audit: AuditContext
 }
@@ -35,16 +28,7 @@ export type RetrievedPackage = {
   readonly retrievedAt: Date
   readonly storedAt: Date
   readonly chargeableDays: number
-  /**
-   * What the customer needs to read the total back.
-   *
-   * A charge nobody can reconstruct is where trust breaks at a locker wall, so
-   * the bands travel with the fee rather than being re-derived by whoever
-   * renders it — a second derivation is a second chance to disagree with the
-   * invoice. A single rate could not do this job: a stay that crossed a tier
-   * boundary was charged at more than one, and naming only the first states an
-   * amount the total contradicts.
-   */
+  /** Bands travel with the fee so a display never re-derives — and never contradicts — the charge. */
   readonly bands: readonly ChargedBand[]
 }
 
@@ -60,14 +44,9 @@ export type RetrievePackageFailure =
   InvalidPickupRequest | MalformedInput | PackageAlreadyRetrieved
 
 /**
- * Levels 2 and 3, orchestrated: a code opens one locker, once, and the stay is
- * priced on the way out.
- *
- * Two things can be wrong with a collection — the code is not a code, or it does
- * not match a parcel awaiting collection — and only the first is described back.
- * A wrong code, a code for a parcel already collected, and a code that never
- * existed are one answer carrying no detail, because a caller able to tell them
- * apart could learn which codes are live.
+ * Collects a parcel by pickup code and prices the stay. All rejections except
+ * a malformed code return one indistinguishable error, so callers cannot probe
+ * which codes are live.
  */
 export class RetrievePackageService {
   constructor(private readonly dependencies: RetrievePackageDependencies) {}
@@ -79,8 +58,7 @@ export class RetrievePackageService {
 
     const code = PickupCode.create(command.pickupCode)
     if (isErr(code)) {
-      // Before any lookup: a code that cannot be a code is a typo, and there is
-      // nothing to check it against.
+      // A malformed code is rejected before any lookup.
       return err(code.error)
     }
 
@@ -88,9 +66,8 @@ export class RetrievePackageService {
 
     return uow.run<Result<RetrievedPackage, RetrievePackageFailure>>(
       async ({ lockers, packages }) => {
-        // By hash, because the plaintext is never stored — the same HMAC that
-        // wrote the column reads it back. Scoped to a stored parcel, which is
-        // what makes a replayed code indistinguishable from a wrong one.
+        // Looked up by hash and scoped to `stored`; the row is held for this
+        // unit of work, so a lost race reads the same `null` a replay does.
         const parcel = await packages.findStoredByCodeHash(
           hasher.hash(code.value)
         )
@@ -102,10 +79,7 @@ export class RetrievePackageService {
         const locker = await lockers.findById(parcel.lockerId)
 
         if (locker === null) {
-          // A stored parcel always has a locker — the foreign key says so.
-          // Reaching here means the locker was soft-deleted underneath a stored
-          // parcel, which is a data problem rather than a bad request, and
-          // answering anything else would be inventing a state.
+          // A stored parcel always has a locker (foreign key); this is a data fault, not a bad request.
           throw new Error(
             `package ${parcel.id} is in locker ${parcel.lockerId}, which no longer exists`
           )
@@ -124,14 +98,18 @@ export class RetrievePackageService {
           return err(collected.error)
         }
 
-        // The locker first, then the parcel. Both writes are in one transaction,
-        // so the order cannot change what commits — but it does decide what a
-        // failure leaves behind for anything that is not transactional, and a
-        // parcel recorded as collected behind a locker that is still occupied is
-        // the worst state this system can reach: the locker is dead and the
-        // package is gone from the system.
+        // Locker first, then parcel: both writes share one transaction, but the
+        // order decides what a mid-flight failure leaves behind.
         await lockers.release(locker.id, command.audit)
-        await packages.save(collected.value, command.audit)
+
+        const written = await packages.save(collected.value, command.audit)
+        if (!written) {
+          // Broken repository contract: the locker is already released in this
+          // transaction, so the throw must roll both writes back.
+          throw new Error(
+            `package ${collected.value.id} could not be marked retrieved`
+          )
+        }
 
         return ok({
           packageId: collected.value.id,
@@ -139,9 +117,7 @@ export class RetrievePackageService {
           fee: priced.total,
           retrievedAt,
           storedAt: parcel.storedAt,
-          // Returned rather than left to whoever displays it: the fee is
-          // explained to the customer in days and rates, and a second
-          // implementation of either would eventually disagree with the invoice.
+          // Returned so a display never re-derives days or rates.
           chargeableDays: duration.value.chargeableDays,
           bands: priced.bands,
         })

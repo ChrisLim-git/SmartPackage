@@ -10,11 +10,8 @@ import {
 } from "./result"
 
 /**
- * Both helpers exist to keep the declared type a union. A `const` initialised
- * with `err("boom")` is narrowed by control flow to `Err<string>`, which leaves
- * `map` no site to infer `T` from and types the callback's argument `unknown`.
- * Real call sites hold the result of a function whose return type is the union,
- * so they never hit it.
+ * Helpers keep the declared type the union; a narrowed literal would leave
+ * `map` nothing to infer `T` from.
  */
 const okResult = (value: number): Result<number, string> => ok(value)
 const errResult = (error: string): Result<number, string> => err(error)
@@ -25,8 +22,6 @@ describe("Result", () => {
 
     expect(isOk(result)).toBe(true)
     expect(isErr(result)).toBe(false)
-    // The guard is what makes this line compile — `result.value` does not
-    // exist on the union.
     if (isOk(result)) expect(result.value).toBe(42)
   })
 
@@ -47,8 +42,7 @@ describe("Result", () => {
   })
 
   it("does not call the mapping function on an err", () => {
-    // A counter rather than `jest.fn()`: the suite runs as ESM, where the
-    // `jest` global is absent and would have to be imported.
+    // Counter, not `jest.fn()`: the ESM suite has no `jest` global.
     let calls = 0
 
     map(errResult("boom"), (n) => {

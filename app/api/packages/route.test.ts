@@ -4,19 +4,8 @@ import { createTestDb } from "@/utils/test-db"
 
 const { pool, db } = createTestDb()
 
-/**
- * The HTTP contract of storing a parcel, and nothing below it.
- *
- * The handler is a strip: guard, validate, delegate, map. So these tests assert
- * status codes, validation failures, the wire shape and the guard wiring — the
- * only things this layer owns. Which locker was chosen and whether the smallest
- * fitting rule holds belong to `store-package-service.test.ts`, which proves them
- * in microseconds and can enumerate cases a route test never should.
- *
- * Only the session *lookup* is stubbed. `createGuards` runs for real, so the
- * 401-versus-403 decision is the real one; a stubbed guard would leave this test
- * asserting its own mock.
- */
+// Asserts only the HTTP contract; locker choice lives in store-package-service.test.ts.
+// Only the session lookup is stubbed — `createGuards` makes the real 401-vs-403 decision.
 const currentSession: { value: unknown } = { value: null }
 
 jest.unstable_mockModule("@infrastructure/external/auth/auth", () => ({
@@ -95,8 +84,7 @@ describe("POST /api/packages", () => {
 
     const response = await POST(request(body()))
 
-    // The 409 is what this layer owns. That nothing suitable was free is proved
-    // in the domain.
+    // The 409 is what this layer owns; that nothing fit is proved in the domain.
     expect(response.status).toBe(409)
     expect((await response.json()).error.message).toMatch(/cannot be stored/)
   })
@@ -114,9 +102,8 @@ describe("POST /api/packages", () => {
     const response = await POST(request(body({ stationId: guessed })))
     const payload = await response.text()
 
-    // The domain error carries the id so the log can name it. Echoing it into the
-    // response confirms to a caller that their probe reached a real row, which is
-    // the whole game with an identifier somebody typed.
+    // The domain error carries the id for the log; echoing it back would
+    // confirm to a caller that their probe reached a real row.
     expect(response.status).toBe(404)
     expect(payload).not.toContain(guessed)
   })
